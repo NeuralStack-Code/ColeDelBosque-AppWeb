@@ -1,0 +1,94 @@
+/* ============================================================
+   Colegio del Bosque — Actividades (galería polaroid mejorada)
+   Requiere redisño_base.css enlazado antes.
+   ============================================================ */
+
+/* ---------- Bandas de sección ---------- */
+.seccion-act { padding: 80px 0; position: relative; }
+.seccion-act.tono-morado { background: var(--fondo-alt); }
+.seccion-act.tono-verde  { background: #eefdf3; }
+.seccion-act.tono-ambar  { background: #fffdf0; }
+
+.seccion-act .cab { text-align: center; margin-bottom: 52px; }
+.seccion-act .cab .pill {
+    display: inline-flex; align-items: center; gap: .5em;
+    font-family: var(--fuente-titulo); font-weight: 600;
+    padding: .45em 1.2em; border-radius: 999px; color: #fff; font-size: .9rem; margin-bottom: 14px;
+}
+.tono-morado .pill { background: var(--azul-marca); }
+.tono-verde  .pill { background: var(--verde); }
+.tono-ambar  .pill { background: #eab308; }
+.seccion-act .cab h2 {
+    font-family: var(--fuente-titulo); font-weight: 700;
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+}
+.seccion-act .cab p { color: var(--texto-suave); margin-top: 8px; }
+
+/* ---------- Grilla de polaroids ---------- */
+.gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 40px 28px;
+    max-width: 1080px;
+    margin: 0 auto;
+    justify-items: center;
+    padding-top: 12px;
+}
+
+/* ---------- Tarjeta polaroid ---------- */
+.polaroid-card {
+    position: relative;
+    background: #fff;
+    padding: 14px 14px 18px;
+    border-radius: 6px;
+    box-shadow: 0 10px 24px rgba(31, 34, 51, .16);
+    width: 250px;
+    transition: transform .3s ease, box-shadow .3s ease;
+    z-index: 1;
+}
+.polaroid-card img {
+    width: 100%;
+    height: 210px;
+    object-fit: cover;
+    border-radius: 3px;
+    display: block;
+}
+.polaroid-card figcaption {
+    margin-top: 12px;
+    text-align: center;
+    font-family: var(--fuente-script);
+    font-size: 1.3rem;
+    color: var(--texto);
+    line-height: 1.2;
+    min-height: 1.4em;
+}
+/* Cinta adhesiva decorativa */
+.polaroid-card::before {
+    content: "";
+    position: absolute;
+    top: -12px; left: 50%;
+    width: 92px; height: 26px;
+    background: rgba(91, 62, 224, .18);
+    border: 1px dashed rgba(91, 62, 224, .35);
+    transform: translateX(-50%) rotate(-4deg);
+    border-radius: 2px;
+}
+.tono-verde .polaroid-card::before { background: rgba(34,197,94,.18); border-color: rgba(34,197,94,.4); }
+.tono-ambar .polaroid-card::before { background: rgba(234,179,8,.22); border-color: rgba(234,179,8,.45); }
+
+/* Rotaciones suaves alternadas */
+.polaroid-card:nth-child(4n+1) { transform: rotate(-3deg); }
+.polaroid-card:nth-child(4n+2) { transform: rotate(2deg); }
+.polaroid-card:nth-child(4n+3) { transform: rotate(-1.5deg); }
+.polaroid-card:nth-child(4n+4) { transform: rotate(3deg); }
+
+.polaroid-card:hover {
+    transform: rotate(0deg) translateY(-10px) scale(1.05);
+    box-shadow: 0 22px 44px rgba(31, 34, 51, .28);
+    z-index: 5;
+}
+
+@media (max-width: 520px) {
+    .gallery { grid-template-columns: 1fr; }
+    .polaroid-card { width: 100%; max-width: 300px; }
+}

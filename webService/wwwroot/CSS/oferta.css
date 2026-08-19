@@ -1,0 +1,85 @@
+/* ============================================================
+   Colegio del Bosque — Oferta educativa
+   Requiere redisño_base.css enlazado antes.
+   ============================================================ */
+
+/* ---------- Niveles ---------- */
+.niveles { padding: 80px 0 40px; }
+.niveles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.nivel {
+    position: relative;
+    border-radius: var(--radio);
+    padding: 40px 34px;
+    color: #fff;
+    overflow: hidden;
+    box-shadow: var(--sombra-md);
+    min-height: 220px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+}
+.nivel.preescolar { background: linear-gradient(135deg, var(--verde), #15a34a); }
+.nivel.primaria   { background: linear-gradient(135deg, var(--azul-pieza), #2563eb); }
+.nivel .emoji {
+    position: absolute; top: 22px; right: 26px;
+    font-size: 3.2rem; opacity: .9;
+}
+.nivel h3 { font-family: var(--fuente-titulo); font-size: 1.8rem; margin-bottom: 8px; }
+.nivel p { opacity: .95; }
+
+/* ---------- Beneficios ---------- */
+.beneficios { padding: 60px 0 90px; }
+.beneficios-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.beneficio {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    padding: 28px 24px;
+    box-shadow: var(--sombra-sm);
+    transition: transform .25s ease, box-shadow .25s ease;
+}
+.beneficio:hover { transform: translateY(-6px); box-shadow: var(--sombra-md); }
+.beneficio .ico {
+    width: 54px; height: 54px; border-radius: 14px;
+    display: grid; place-items: center; font-size: 1.5rem; color: #fff; margin-bottom: 14px;
+}
+.beneficio:nth-child(1) .ico { background: var(--rojo); }
+.beneficio:nth-child(2) .ico { background: var(--azul-pieza); }
+.beneficio:nth-child(3) .ico { background: var(--verde); }
+.beneficio:nth-child(4) .ico { background: var(--amarillo); color: #7a5b00; }
+.beneficio:nth-child(5) .ico { background: var(--azul-marca); }
+.beneficio h3 { font-family: var(--fuente-titulo); font-size: 1.15rem; margin-bottom: 6px; }
+.beneficio p { color: var(--texto-suave); font-size: .95rem; }
+
+/* ---------- Instalaciones ---------- */
+.instalaciones { padding: 90px 0; background: var(--fondo-alt); }
+.inst-grid { display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 190px; gap: 16px; }
+.inst-grid figure { overflow: hidden; border-radius: var(--radio-sm); box-shadow: var(--sombra-sm); }
+.inst-grid img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s ease; }
+.inst-grid figure:hover img { transform: scale(1.08); }
+.inst-grid .g-grande { grid-column: span 2; grid-row: span 2; }
+.inst-grid .g-alto { grid-row: span 2; }
+
+/* ---------- CTA reutilizable ---------- */
+.cta { padding: 40px 0 90px; }
+.cta-caja {
+    background: linear-gradient(135deg, var(--azul-marca) 0%, var(--azul-osc) 100%);
+    border-radius: 32px; padding: 64px 48px; text-align: center; color: #fff;
+    position: relative; overflow: hidden; box-shadow: var(--sombra-lg);
+}
+.cta-caja::before, .cta-caja::after { content: ""; position: absolute; border-radius: 50%; background: rgba(255,255,255,.08); }
+.cta-caja::before { width: 260px; height: 260px; top: -80px; left: -60px; }
+.cta-caja::after { width: 200px; height: 200px; bottom: -70px; right: -40px; }
+.cta-caja h2 { font-family: var(--fuente-titulo); font-size: clamp(1.8rem, 4vw, 2.6rem); margin-bottom: 12px; position: relative; }
+.cta-caja p { opacity: .9; font-size: 1.1rem; margin-bottom: 28px; position: relative; }
+.cta-botones { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; }
+
+@media (max-width: 960px) {
+    .niveles-grid { grid-template-columns: 1fr; }
+    .beneficios-grid { grid-template-columns: repeat(2, 1fr); }
+    .inst-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 520px) {
+    .beneficios-grid { grid-template-columns: 1fr; }
+    .inst-grid { grid-template-columns: 1fr; grid-auto-rows: 200px; }
+    .inst-grid .g-grande { grid-column: span 1; grid-row: span 1; }
+    .cta-caja { padding: 48px 24px; }
+}

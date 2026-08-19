@@ -1,0 +1,16 @@
+# Credenciales — NUNCA subir
+.env
+*.env
+
+# Dependencias
+vendor/
+node_modules/
+
+# Logs y caché
+storage/logs/
+storage/license_cache.json
+*.log
+
+# Sistema
+.DS_Store
+Thumbs.db

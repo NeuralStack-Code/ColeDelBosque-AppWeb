@@ -1,0 +1,104 @@
+/* ============================================================
+   Colegio del Bosque — Inicio de sesión
+   Requiere redisño_base.css enlazado antes.
+   ============================================================ */
+
+.login {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+}
+
+/* ---------- Panel de marca ---------- */
+.login-marca {
+    position: relative;
+    color: #fff;
+    padding: 56px 60px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    background:
+        radial-gradient(circle at 20% 25%, rgba(255,255,255,.14), transparent 45%),
+        radial-gradient(circle at 85% 80%, rgba(59,130,246,.35), transparent 45%),
+        linear-gradient(150deg, var(--azul-marca) 0%, var(--azul-osc) 100%);
+}
+.login-marca .top { display: flex; align-items: center; gap: .8em; }
+.login-marca .top img { width: 60px; height: 60px; border-radius: 50%; background: #fff; padding: 4px; }
+.login-marca .top span { font-family: var(--fuente-titulo); font-weight: 600; font-size: 1.25rem; }
+.login-marca .frase {
+    font-family: var(--fuente-titulo);
+    font-weight: 700;
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    line-height: 1.1;
+}
+.login-marca .frase em { font-family: var(--fuente-script); font-style: normal; color: #d9ff9e; }
+.login-marca .pie { font-size: .9rem; opacity: .8; }
+
+/* Piezas decorativas */
+.login-marca .deco-pieza {
+    position: absolute; width: 54px; height: 54px; border-radius: 14px; opacity: .9;
+}
+.login-marca .p1 { background: var(--rojo);    top: 30%; right: 14%; transform: rotate(12deg); }
+.login-marca .p2 { background: var(--amarillo);top: 55%; right: 32%; transform: rotate(-8deg); }
+.login-marca .p3 { background: var(--verde);   top: 68%; right: 10%; transform: rotate(20deg); }
+
+/* ---------- Panel de formulario ---------- */
+.login-form {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 24px;
+    background: var(--fondo-alt);
+}
+.login-caja {
+    width: 100%;
+    max-width: 400px;
+    background: #fff;
+    border-radius: var(--radio);
+    box-shadow: var(--sombra-md);
+    padding: 42px 36px;
+}
+.login-caja h1 { font-family: var(--fuente-titulo); font-size: 1.8rem; margin-bottom: 4px; }
+.login-caja .info { color: var(--texto-suave); font-size: .95rem; margin-bottom: 28px; }
+
+.login-caja label {
+    display: block; font-family: var(--fuente-titulo);
+    font-weight: 500; font-size: .92rem; margin-bottom: 8px;
+}
+.input-pass { position: relative; }
+.input-pass input {
+    width: 100%; font-family: var(--fuente-texto); font-size: 1rem;
+    background: var(--fondo-alt); border: 2px solid transparent;
+    border-radius: var(--radio-sm); padding: 14px 46px 14px 15px; color: var(--texto);
+    transition: border-color .2s ease, background .2s ease;
+}
+.input-pass input:focus { outline: none; background: #fff; border-color: var(--azul-marca); }
+.input-pass .ojo {
+    position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+    width: 24px; cursor: pointer; opacity: .6; transition: opacity .2s ease;
+}
+.input-pass .ojo:hover { opacity: 1; }
+
+.olvida { display: block; text-align: right; color: var(--azul-marca); font-size: .85rem; margin: 12px 0 24px; cursor: pointer; }
+.olvida:hover { text-decoration: underline; }
+
+.ISbtn { width: 100%; justify-content: center; margin-bottom: 18px; }
+.volver { display: block; text-align: center; color: var(--texto-suave); font-size: .9rem; }
+.volver:hover { color: var(--azul-marca); }
+
+/* ---------- Modal ---------- */
+#warning {
+    border: none; border-radius: var(--radio);
+    box-shadow: var(--sombra-lg); padding: 34px 40px;
+    max-width: 420px; text-align: center; font-family: var(--fuente-texto);
+}
+#warning::backdrop { background: rgba(26, 23, 48, .5); backdrop-filter: blur(2px); }
+#warning #mensaje { font-size: 1.05rem; margin-bottom: 22px; color: var(--texto); }
+#warning .btnModal { display: flex; justify-content: center; }
+
+@media (max-width: 880px) {
+    .login { grid-template-columns: 1fr; }
+    .login-marca { display: none; }
+    .login-form { min-height: 100vh; }
+}

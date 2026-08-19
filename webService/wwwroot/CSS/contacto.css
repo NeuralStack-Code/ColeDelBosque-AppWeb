@@ -1,0 +1,102 @@
+/* ============================================================
+   Colegio del Bosque — Contacto
+   Requiere redisño_base.css enlazado antes.
+   ============================================================ */
+
+.contacto-wrap { padding: 80px 0 90px; }
+.contacto-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; align-items: start; }
+
+/* ---------- Tarjeta base ---------- */
+.tarjeta {
+    background: #fff;
+    border: 1px solid var(--borde);
+    border-radius: var(--radio);
+    box-shadow: var(--sombra-sm);
+    padding: 34px;
+}
+.tarjeta h2 {
+    font-family: var(--fuente-titulo);
+    font-size: 1.6rem;
+    margin-bottom: 6px;
+}
+.tarjeta .sub { color: var(--texto-suave); font-size: .95rem; margin-bottom: 22px; }
+
+/* ---------- Formulario ---------- */
+.campo { margin-bottom: 18px; }
+.campo label {
+    display: block;
+    font-family: var(--fuente-titulo);
+    font-weight: 500;
+    font-size: .92rem;
+    margin-bottom: 7px;
+}
+.campo input,
+.campo textarea {
+    width: 100%;
+    font-family: var(--fuente-texto);
+    font-size: 1rem;
+    color: var(--texto);
+    background: var(--fondo-alt);
+    border: 2px solid transparent;
+    border-radius: var(--radio-sm);
+    padding: 13px 15px;
+    transition: border-color .2s ease, background .2s ease;
+}
+.campo textarea { resize: vertical; min-height: 130px; }
+.campo input:focus,
+.campo textarea:focus {
+    outline: none;
+    background: #fff;
+    border-color: var(--azul-marca);
+}
+.campo input::placeholder,
+.campo textarea::placeholder { color: #a8adc4; }
+
+.form-nota { font-size: .82rem; color: var(--texto-suave); margin-bottom: 20px; }
+.enviar { width: 100%; justify-content: center; }
+
+/* ---------- Info / ubicación ---------- */
+.info-item { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 20px; }
+.info-item .ic {
+    flex: 0 0 auto;
+    width: 44px; height: 44px; border-radius: 12px;
+    display: grid; place-items: center; font-size: 1.2rem; color: #fff;
+}
+.info-item:nth-child(2) .ic { background: var(--rojo); }
+.info-item:nth-child(3) .ic { background: var(--verde); }
+.info-item h4 { font-family: var(--fuente-titulo); font-size: 1rem; margin-bottom: 2px; }
+.info-item p { color: var(--texto-suave); font-size: .95rem; }
+
+.mapa {
+    width: 100%; height: 260px; border: 0;
+    border-radius: var(--radio-sm);
+    margin: 8px 0 24px;
+    box-shadow: var(--sombra-sm);
+}
+
+.redes-contacto { display: flex; gap: 12px; }
+.redes-contacto a {
+    display: inline-flex; align-items: center; gap: .5em;
+    font-family: var(--fuente-titulo); font-weight: 600; font-size: .92rem;
+    padding: .6em 1.1em; border-radius: 999px; color: #fff;
+    transition: transform .2s ease, box-shadow .2s ease;
+}
+.redes-contacto a:hover { transform: translateY(-3px); box-shadow: var(--sombra-md); }
+.redes-contacto .fb { background: #1877f2; }
+.redes-contacto .ig { background: linear-gradient(45deg, #f09433, #dc2743, #bc1888); }
+.redes-contacto img { width: 20px; height: 20px; filter: brightness(0) invert(1); }
+
+/* ---------- Modal ---------- */
+#warning {
+    border: none; border-radius: var(--radio);
+    box-shadow: var(--sombra-lg); padding: 34px 40px;
+    max-width: 420px; text-align: center;
+    font-family: var(--fuente-texto);
+}
+#warning::backdrop { background: rgba(26, 23, 48, .5); backdrop-filter: blur(2px); }
+#warning #mensaje { font-size: 1.05rem; margin-bottom: 22px; color: var(--texto); }
+#warning .btnModal { display: flex; justify-content: center; }
+
+@media (max-width: 880px) {
+    .contacto-grid { grid-template-columns: 1fr; }
+}
