@@ -89,8 +89,12 @@ $img = $base . '/webService/wwwroot/img';
             grupos = d.items || [];
             const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
             document.getElementById('grado').innerHTML = opts || '<option value="">Sin grupos</option>';
-            document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' + opts;
+            document.getElementById('fGrupo').innerHTML =
+                '<option value="">Todos</option><option value="__sin__">⚠ Sin grupo</option>' + opts;
         }
+
+        // ids de grupos válidos (para detectar alumnos sin grupo)
+        const idsValidos = () => new Set(grupos.map(g => Number(g.id_grupo)));
 
         async function cargarAlumnos() {
             const d = await (await fetch(API + '?action=alumnos_listar')).json();
@@ -102,20 +106,26 @@ $img = $base . '/webService/wwwroot/img';
             const mat = document.getElementById('fMat').value.toLowerCase();
             const nom = document.getElementById('fNom').value.toLowerCase();
             const grp = document.getElementById('fGrupo').value;
+            const validos = idsValidos();
+            const esHuerfano = a => !validos.has(Number(a.grupo_id));
             const f = todos.filter(a => {
                 if (mat && !(a.matricula || '').toLowerCase().includes(mat)) return false;
                 if (nom && !`${a.nombre} ${a.paterno} ${a.materno}`.toLowerCase().includes(nom)) return false;
-                if (grp && String(a.grupo_id) !== grp) return false;
+                if (grp === '__sin__') { if (!esHuerfano(a)) return false; }
+                else if (grp && String(a.grupo_id) !== grp) return false;
                 return true;
             });
             filas.innerHTML = '';
             vacio.style.display = f.length ? 'none' : 'block';
             f.forEach(a => {
+                const celdaGrupo = esHuerfano(a)
+                    ? '<span class="pill-sin">Sin grupo</span>'
+                    : (a.grado ?? '—');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${a.matricula ?? ''}</td>
                     <td>${a.nombre} ${a.paterno} ${a.materno}</td>
-                    <td>${a.grado ?? '—'}</td>
+                    <td>${celdaGrupo}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
@@ -167,8 +177,7 @@ $img = $base . '/webService/wwwroot/img';
             if (d.success) cargarAlumnos();
         }
 
-        cargarGrupos();
-        cargarAlumnos();
+        (async () => { await cargarGrupos(); await cargarAlumnos(); })();
     </script>
 </body>
 </html>

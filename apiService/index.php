@@ -22,7 +22,9 @@ $routes = [
     'dashboard'         => dirname(__DIR__) . '/webService/actions/dashboard.php',
     'recibos'           => dirname(__DIR__) . '/webService/actions/recibos.php',
     'tipos-recibo'      => dirname(__DIR__) . '/webService/actions/tipos_recibo.php',
+    'tipos-descuento'   => dirname(__DIR__) . '/webService/actions/tipos_descuento.php',
     'materias'          => dirname(__DIR__) . '/webService/actions/materias.php',
+    'ciclos'            => dirname(__DIR__) . '/webService/actions/ciclos.php',
 ];
 
 if (array_key_exists($route, $routes)) {

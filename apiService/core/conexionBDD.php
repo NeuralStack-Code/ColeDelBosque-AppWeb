@@ -18,3 +18,6 @@ if (!mysqli_real_connect(
 }
 
 mysqli_set_charset($conexion, 'utf8mb4');
+
+// Helper del catálogo de estatus (statusId): disponible en todos los actions
+require_once __DIR__ . '/status.php';

@@ -129,6 +129,7 @@ body {
 .acceso:nth-child(4) .a-ico { background: var(--amarillo); color: #7a5b00; }
 .acceso:nth-child(5) .a-ico { background: var(--azul-marca); }
 .acceso:nth-child(6) .a-ico { background: var(--azul-osc); }
+.acceso:nth-child(7) .a-ico { background: #14b8a6; }
 
 @media (max-width: 780px) { .dash-charts { grid-template-columns: 1fr; } }
 
@@ -234,6 +235,10 @@ dialog.modal::backdrop { background: rgba(26,23,48,.5); backdrop-filter: blur(2p
 .badge-estatus { display: inline-block; padding: .3em .85em; border-radius: 999px; font-size: .78rem; font-weight: 700; text-transform: capitalize; }
 .badge-estatus.pagado    { background: #dcfce7; color: #15803d; }
 .badge-estatus.pendiente { background: #fef3c7; color: #b45309; }
+.badge-estatus.parcial   { background: #dbeafe; color: #1d4ed8; }
+
+/* Píldora de alumno sin grupo (dato a corregir) */
+.pill-sin { display: inline-block; padding: .28em .8em; border-radius: 999px; font-size: .78rem; font-weight: 700; background: #fdeaea; color: var(--rojo); }
 
 /* Secciones del panel padre */
 .panel-seccion { margin-bottom: 40px; }

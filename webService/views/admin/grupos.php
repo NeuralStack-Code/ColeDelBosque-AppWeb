@@ -32,9 +32,12 @@ $img = $base . '/webService/wwwroot/img';
             <h2>Grupos</h2>
             <button class="btn btn-primario" onclick="abrirAlta()">+ Nuevo grupo</button>
         </div>
+        <div class="filtros">
+            <div class="f"><label>Ciclo escolar</label><select id="fCiclo"><option value="">Todos los ciclos</option></select></div>
+        </div>
         <div class="tabla-scroll">
             <table class="tabla">
-                <thead><tr><th>Grado</th><th>Materias</th><th></th></tr></thead>
+                <thead><tr><th>Grado</th><th>Ciclo</th><th>Nivel</th><th>Materias</th><th></th></tr></thead>
                 <tbody id="filas"></tbody>
             </table>
         </div>
@@ -48,6 +51,10 @@ $img = $base . '/webService/wwwroot/img';
             <form id="form">
                 <input type="hidden" id="id_grupo">
                 <div class="campo"><label>Grado</label><input type="text" id="grado" placeholder="Ej. 1° A" required></div>
+                <div class="fila-2">
+                    <div class="campo"><label>Ciclo escolar</label><select id="ciclo_id"><option value="">Sin ciclo</option></select></div>
+                    <div class="campo"><label>Nivel (orden)</label><input type="number" id="nivel" min="1" placeholder="Ej. 1 = 1°"></div>
+                </div>
 
                 <div class="campo" id="campoMaestra" style="display:none;">
                     <label>Maestra asignada</label>
@@ -88,8 +95,21 @@ $img = $base . '/webService/wwwroot/img';
                 .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
         }
 
+        let ciclos = [], cicloActivo = '';
+
+        async function cargarCiclos() {
+            const d = await (await fetch(window.BASE_URL + '/api/ciclos?action=listar')).json();
+            ciclos = d.items || [];
+            const act = ciclos.find(c => Number(c.activo) === 1);
+            cicloActivo = act ? String(act.id_ciclo) : '';
+            const opts = ciclos.map(c => `<option value="${c.id_ciclo}">${c.nombre}${Number(c.activo) === 1 ? ' (activo)' : ''}</option>`).join('');
+            document.getElementById('fCiclo').innerHTML = '<option value="">Todos los ciclos</option>' + opts;
+            document.getElementById('ciclo_id').innerHTML = '<option value="">Sin ciclo</option>' + opts;
+        }
+
         async function cargar() {
-            const r = await fetch(API + '?action=grupos_listar');
+            const fc = document.getElementById('fCiclo').value;
+            const r = await fetch(API + '?action=grupos_listar' + (fc ? '&ciclo_id=' + fc : ''));
             const d = await r.json();
             const items = d.items || [];
             filas.innerHTML = '';
@@ -98,6 +118,8 @@ $img = $base . '/webService/wwwroot/img';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong>${g.grado}</strong></td>
+                    <td>${g.ciclo_nombre ?? '—'}</td>
+                    <td>${g.nivel ?? '—'}</td>
                     <td>${g.num_materias} materia(s)</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -145,6 +167,7 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('id_grupo').value = '';
             document.getElementById('campoMaestra').style.display = 'none';
             reset();
+            document.getElementById('ciclo_id').value = cicloActivo; // por defecto el ciclo activo
             modal.showModal();
         }
 
@@ -156,6 +179,8 @@ $img = $base . '/webService/wwwroot/img';
             const d = await r.json();
             if (!d.success) { window.notify('error', d.message); return; }
             document.getElementById('grado').value = d.grupo.grado;
+            document.getElementById('ciclo_id').value = d.grupo.ciclo_id ?? '';
+            document.getElementById('nivel').value = d.grupo.nivel ?? '';
             materiasExistentes = d.materias.slice();
             // maestra select
             const sel = document.getElementById('maestra');
@@ -171,6 +196,8 @@ $img = $base . '/webService/wwwroot/img';
             e.preventDefault();
             const id = document.getElementById('id_grupo').value;
             const fd = new FormData();
+            fd.append('ciclo_id', document.getElementById('ciclo_id').value);
+            fd.append('nivel', document.getElementById('nivel').value);
             if (id) {
                 fd.append('id_grupo', id);
                 fd.append('grado', document.getElementById('grado').value);
@@ -192,7 +219,11 @@ $img = $base . '/webService/wwwroot/img';
         });
 
         async function eliminar(g) {
-            if (!await window.confirmar(`¿Eliminar el grupo "${g.grado}" y todas sus materias?`)) return;
+            const n = Number(g.num_alumnos || 0);
+            const aviso = n > 0
+                ? `¿Eliminar el grupo "${g.grado}"? Sus ${n} alumno(s) quedarán en «Sin grupo» hasta que los reasignes.`
+                : `¿Eliminar el grupo "${g.grado}" y todas sus materias?`;
+            if (!await window.confirmar(aviso)) return;
             const fd = new FormData();
             fd.append('id_grupo', g.id_grupo);
             const r = await fetch(API + '?action=grupo_eliminar', { method: 'POST', body: fd });
@@ -201,7 +232,9 @@ $img = $base . '/webService/wwwroot/img';
             if (d.success) cargar();
         }
 
-        cargar();
+        document.getElementById('fCiclo').addEventListener('change', cargar);
+
+        (async () => { await cargarCiclos(); cargar(); })();
     </script>
 </body>
 </html>

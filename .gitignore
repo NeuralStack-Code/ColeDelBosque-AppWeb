@@ -1,16 +1,17 @@
-# Credenciales — NUNCA subir
+# Secretos y config local
 .env
-*.env
+.env.*
+!.env.example
 
-# Dependencias
-vendor/
-node_modules/
-
-# Logs y caché
-storage/logs/
-storage/license_cache.json
-*.log
-
-# Sistema
+# Editor / OS
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
+
+# Logs y temporales
+*.log
+_pendientes.sql
+_prev_*.html
+_dev*.php
+/*.sql

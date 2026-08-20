@@ -27,8 +27,8 @@ switch ($action) {
         $grupos   = (int)   escalar($conexion, 'SELECT COUNT(*) FROM grupo');
         $saldo    = (float) escalar($conexion,
             "SELECT COALESCE(SUM(CASE WHEN naturaleza = 'ingreso' THEN monto ELSE -monto END), 0) FROM recibo");
-        $pend     = (int)   escalar($conexion, "SELECT COUNT(*) FROM colegiatura WHERE LOWER(estatus) = 'pendiente'");
-        $pagados  = (int)   escalar($conexion, "SELECT COUNT(*) FROM colegiatura WHERE LOWER(estatus) = 'pagado'");
+        $pend     = (int)   escalar($conexion, "SELECT COUNT(*) FROM colegiatura WHERE status_id <> (SELECT id_status FROM status WHERE ambito='pago' AND clave='pagado')");
+        $pagados  = (int)   escalar($conexion, "SELECT COUNT(*) FROM colegiatura WHERE status_id = (SELECT id_status FROM status WHERE ambito='pago' AND clave='pagado')");
 
         // Alumnos por grupo (para la gráfica)
         $porGrupo = [];

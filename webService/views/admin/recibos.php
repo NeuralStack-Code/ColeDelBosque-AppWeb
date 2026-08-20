@@ -48,7 +48,10 @@ $img = $base . '/webService/wwwroot/img';
             <div class="f"><label>Año</label><select id="fAnio"><option value="">Todos</option></select></div>
             <div class="f"><label>Mes</label><select id="fMes"><option value="">Todos</option></select></div>
             <div class="f buscar"><label>Buscar</label><input type="text" id="fBuscar" placeholder="Comentario o destinatario…"></div>
-            <div class="f-btns"><button class="btn btn-fantasma" onclick="limpiar()">Limpiar</button></div>
+            <div class="f-btns">
+                <button class="btn btn-fantasma" onclick="limpiar()">Limpiar</button>
+                <button class="btn btn-claro" onclick="exportarCSV()" style="box-shadow:var(--sombra-sm);">⬇ CSV</button>
+            </div>
         </div>
 
         <div class="tabla-scroll">
@@ -161,6 +164,7 @@ $img = $base . '/webService/wwwroot/img';
                     <td>${r.tipo_pago || '—'}</td>
                     <td>${r.comentario || '—'}</td>
                     <td><div class="acciones">
+                        <a class="icon-btn" href="${window.BASE_URL}/recibo?id=${r.id_recibo}" target="_blank" title="Ver recibo" style="background:var(--azul-claro);color:var(--azul-marca)"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></a>
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
                     </div></td>`;
@@ -171,6 +175,23 @@ $img = $base . '/webService/wwwroot/img';
         }
         ['fNat', 'fTipo', 'fAnio', 'fMes', 'fBuscar'].forEach(id => document.getElementById(id).addEventListener('input', render));
         function limpiar() { ['fNat', 'fTipo', 'fAnio', 'fMes'].forEach(id => document.getElementById(id).value = ''); fBuscar.value = ''; render(); }
+
+        // Exportar CSV según los filtros en pantalla
+        function exportarCSV() {
+            const f = filtrar();
+            if (!f.length) { window.notify('info', 'No hay recibos para exportar.'); return; }
+            const head = ['Fecha', 'Tipo', 'Destinatario', 'Naturaleza', 'Monto', 'Tipo de pago', 'Comentario'];
+            const rows = f.map(r => [
+                (r.fecha || '').replace('T', ' ').slice(0, 16),
+                r.tipo_nombre || '', r.destinatario || '', r.naturaleza || '',
+                r.monto, r.tipo_pago || '', r.comentario || ''
+            ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
+            const csv = '﻿' + [head.join(','), ...rows].join('\n');
+            const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+            const a = document.createElement('a');
+            a.href = url; a.download = 'finanzas_' + new Date().toISOString().slice(0, 10) + '.csv';
+            a.click(); URL.revokeObjectURL(url);
+        }
 
         // ---- Form: tipo → naturaleza, destinatario → persona ----
         document.getElementById('tipo_recibo_id').addEventListener('change', function () {

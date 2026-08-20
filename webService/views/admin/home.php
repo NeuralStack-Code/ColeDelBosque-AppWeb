@@ -109,6 +109,11 @@ function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
                 <span class="a-txt"><strong>Colegiaturas</strong><span>Registro y estatus de pagos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <a class="acceso" href="<?= $base ?>/administrador/ciclos">
+                <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
+                <span class="a-txt"><strong>Ciclo escolar</strong><span>Ciclos y periodos</span></span>
+                <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+            </a>
         </div>
     </div>
 

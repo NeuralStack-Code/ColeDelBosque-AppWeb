@@ -50,7 +50,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
                 <thead>
                     <tr>
                         <th>Alumno</th>
-                        <th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>Examen</th>
+                        <th>P1</th><th>P2</th><th>P3</th><th>Final</th>
                         <th>Reporte</th><th></th>
                     </tr>
                 </thead>
@@ -108,22 +108,33 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             d.alumnos.forEach(a => {
                 const tr = document.createElement('tr');
                 const num = (v) => `value="${v ?? ''}"`;
+                const prom = promedio(a.p1, a.p2, a.p3);
                 tr.innerHTML = `
                     <td class="alumno">${a.nombre_completo}</td>
-                    <td><input type="number" min="0" max="10" step="0.1" data-f="t1" ${num(a.t1)}></td>
-                    <td><input type="number" min="0" max="10" step="0.1" data-f="t2" ${num(a.t2)}></td>
-                    <td><input type="number" min="0" max="10" step="0.1" data-f="t3" ${num(a.t3)}></td>
-                    <td><input type="number" min="0" max="10" step="0.1" data-f="t4" ${num(a.t4)}></td>
-                    <td><input type="number" min="0" max="10" step="0.1" data-f="examen" ${num(a.examen)}></td>
+                    <td><input type="number" min="0" max="10" step="0.1" data-f="p1" ${num(a.p1)}></td>
+                    <td><input type="number" min="0" max="10" step="0.1" data-f="p2" ${num(a.p2)}></td>
+                    <td><input type="number" min="0" max="10" step="0.1" data-f="p3" ${num(a.p3)}></td>
+                    <td><input type="number" min="0" max="10" step="0.1" data-f="final" ${num(a.calif_final)} placeholder="${prom}" title="Promedio automático de P1–P3; edítalo solo si quieres sobrescribir"></td>
                     <td><input type="text" data-f="reporte" placeholder="Opcional" value="${(a.reporte ?? '').replace(/"/g,'&quot;')}"></td>
                     <td><button class="btn-guardar" data-id="${a.id_cuenta}">Guardar</button></td>`;
                 filas.appendChild(tr);
             });
             tabla.style.display = '';
             vacio.style.display = 'none';
+            // Promedio automático en vivo (placeholder del Final)
+            filas.querySelectorAll('tr').forEach(tr => {
+                const ps = ['p1', 'p2', 'p3'].map(f => tr.querySelector(`[data-f="${f}"]`));
+                const fin = tr.querySelector('[data-f="final"]');
+                const upd = () => { fin.placeholder = promedio(ps[0].value, ps[1].value, ps[2].value); };
+                ps.forEach(i => i.addEventListener('input', upd));
+            });
             filas.querySelectorAll('.btn-guardar').forEach(b =>
                 b.addEventListener('click', () => guardar(b))
             );
+        }
+        function promedio(a, b, c) {
+            const arr = [a, b, c].filter(v => v !== null && v !== '' && !isNaN(Number(v))).map(Number);
+            return arr.length ? (arr.reduce((x, y) => x + y, 0) / arr.length).toFixed(1) : '—';
         }
 
         async function guardar(btn) {

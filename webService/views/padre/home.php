@@ -34,7 +34,7 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
             <h2><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg> Mis calificaciones</h2>
             <div class="tabla-scroll">
                 <table class="tabla">
-                    <thead><tr><th>Materia</th><th>T1</th><th>T2</th><th>T3</th><th>T4</th><th>Examen</th><th>Promedio</th><th>Reporte</th></tr></thead>
+                    <thead><tr><th>Materia</th><th>P1</th><th>P2</th><th>P3</th><th>Final</th><th>Reporte</th></tr></thead>
                     <tbody id="filasCalif"></tbody>
                 </table>
             </div>
@@ -43,10 +43,10 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
 
         <!-- Pagos -->
         <div class="panel-seccion">
-            <h2><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Mis colegiaturas</h2>
+            <h2><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Mis pagos</h2>
             <div class="tabla-scroll">
                 <table class="tabla">
-                    <thead><tr><th>Mes</th><th>Monto</th><th>Fecha de pago</th><th>Estatus</th></tr></thead>
+                    <thead><tr><th>Concepto</th><th>Vence</th><th>Monto</th><th>Recargo</th><th>Descuento</th><th>Total</th><th>Estatus</th></tr></thead>
                     <tbody id="filasPagos"></tbody>
                 </table>
             </div>
@@ -61,14 +61,6 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
         function cerrarSesion() {
             fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
                 .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
-        }
-
-        function promedio(c) {
-            const notas = [c.t1, c.t2, c.t3, c.t4, c.examen].map(Number).filter(n => !isNaN(n) && n !== null);
-            const vals = [c.t1, c.t2, c.t3, c.t4, c.examen].filter(v => v !== null && v !== '');
-            if (!vals.length) return '—';
-            const sum = vals.reduce((a, b) => a + Number(b), 0);
-            return (sum / vals.length).toFixed(1);
         }
 
         async function cargar() {
@@ -87,8 +79,8 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
                 const cel = v => `<td>${(v === null || v === '') ? '—' : v}</td>`;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td><strong>${c.materia}</strong></td>
-                    ${cel(c.t1)}${cel(c.t2)}${cel(c.t3)}${cel(c.t4)}${cel(c.examen)}
-                    <td><strong>${promedio(c)}</strong></td>
+                    ${cel(c.p1)}${cel(c.p2)}${cel(c.p3)}
+                    <td><strong>${c.promedio ?? '—'}</strong></td>
                     <td>${c.reporte || '—'}</td>`;
                 fc.appendChild(tr);
             });
@@ -97,13 +89,25 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
             const fp = document.getElementById('filasPagos');
             fp.innerHTML = '';
             document.getElementById('vacioPagos').style.display = d.pagos.length ? 'none' : 'block';
+            const ESTLBL = { pendiente: 'Pendiente', parcial: 'Pago parcial', pagado: 'Pagado' };
             d.pagos.forEach(p => {
                 const est = (p.estatus || 'pendiente').toLowerCase();
+                const rec = Number(p.recargo_calc) ? `<span style="color:var(--rojo)">${money(p.recargo_calc)}</span>` : '—';
+                const des = Number(p.descuento)
+                    ? `<span style="color:var(--verde)">−${money(p.descuento)}</span>${p.concepto_descuento ? ' <small style="color:var(--texto-suave)">(' + p.concepto_descuento + ')</small>' : ''}`
+                    : '—';
+                const saldoLinea = (est !== 'pagado' && Number(p.abonado) > 0)
+                    ? `<br><small style="color:var(--texto-suave)">Abonado ${money(p.abonado)} · Saldo <strong>${money(p.saldo)}</strong></small>` : '';
+                const reciboLink = p.recibo_id
+                    ? ` <a href="${window.BASE_URL}/recibo?id=${p.recibo_id}" target="_blank" style="color:var(--azul-marca);font-size:.8rem;margin-left:6px;white-space:nowrap;">🧾 recibo</a>` : '';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td>${p.mes ?? ''}</td>
+                    <td>${p.fecha_vencimiento ?? '—'}</td>
                     <td>${money(p.monto)}</td>
-                    <td>${p.fecha_pago ?? '—'}</td>
-                    <td><span class="badge-estatus ${est}">${est}</span></td>`;
+                    <td>${rec}</td>
+                    <td>${des}</td>
+                    <td><strong>${money(p.total)}</strong>${saldoLinea}</td>
+                    <td><span class="badge-estatus ${est}">${ESTLBL[est] || est}</span>${reciboLink}</td>`;
                 fp.appendChild(tr);
             });
         }

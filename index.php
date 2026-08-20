@@ -44,6 +44,9 @@ $routes = [
     //Padre / alumno (permiso_id = 3)
     'padre'            => __DIR__ . '/webService/views/padre/home.php',
 
+    //Compartida (admin + padre): recibo imprimible
+    'recibo'           => __DIR__ . '/webService/views/recibo.php',
+
     //Admin (permiso_id = 1)
     'administrador'               => __DIR__ . '/webService/views/admin/home.php',
     'administrador/alumnos'       => __DIR__ . '/webService/views/admin/alumnos.php',
@@ -52,12 +55,14 @@ $routes = [
     'administrador/colegiaturas'  => __DIR__ . '/webService/views/admin/colegiaturas.php',
     'administrador/recibos'       => __DIR__ . '/webService/views/admin/recibos.php',
     'administrador/tipos-recibo'  => __DIR__ . '/webService/views/admin/tipos_recibo.php',
+    'administrador/tipos-descuento' => __DIR__ . '/webService/views/admin/tipos_descuento.php',
     'administrador/materias'      => __DIR__ . '/webService/views/admin/materias.php',
+    'administrador/ciclos'        => __DIR__ . '/webService/views/admin/ciclos.php',
 ];
 
-// Admin encerrado en su panel: solo puede navegar rutas 'administrador' y 'administrador/*'
+// Admin encerrado en su panel: solo puede navegar rutas 'administrador' y 'administrador/*' (+ recibo)
 if (isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 1) {
-    if ($route !== 'administrador' && strpos($route, 'administrador/') !== 0) {
+    if ($route !== 'administrador' && strpos($route, 'administrador/') !== 0 && $route !== 'recibo') {
         header('Location: ' . BASE_URL . '/administrador');
         exit;
     }

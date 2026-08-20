@@ -73,9 +73,10 @@ function crearPersona(mysqli $conexion, int $permiso): void {
     $usuarioId = mysqli_insert_id($conexion);
     mysqli_stmt_close($u);
 
-    // cuenta
-    $c = mysqli_prepare($conexion, 'INSERT INTO cuenta (matricula, usuario_id, grupo_id, permiso_id) VALUES (?, ?, ?, ?)');
-    mysqli_stmt_bind_param($c, 'siii', $matEnc, $usuarioId, $grupo, $permiso);
+    // cuenta (nace activa)
+    $stActivo = statusId($conexion, 'alumno', 'activo');
+    $c = mysqli_prepare($conexion, 'INSERT INTO cuenta (matricula, usuario_id, grupo_id, permiso_id, status_id) VALUES (?, ?, ?, ?, ?)');
+    mysqli_stmt_bind_param($c, 'siiii', $matEnc, $usuarioId, $grupo, $permiso, $stActivo);
     if (!mysqli_stmt_execute($c)) {
         // rollback del usuario si falla la cuenta
         mysqli_query($conexion, 'DELETE FROM usuario WHERE id_usuario = ' . (int) $usuarioId);
@@ -197,10 +198,16 @@ switch ($action) {
 
     /* ---------- GRUPOS ---------- */
     case 'grupos_listar':
-        $sql = 'SELECT g.id_grupo, g.grado, g.maestra_id,
-                       (SELECT COUNT(*) FROM materia m WHERE m.grupo_id = g.id_grupo) AS num_materias
+        $cicloFiltro = (int) ($_GET['ciclo_id'] ?? 0);
+        // id_grupo = 0 es un bucket fantasma "Sin grupo": nunca debe ofrecerse como grupo real.
+        $where = ' WHERE g.id_grupo <> 0' . ($cicloFiltro > 0 ? ' AND g.ciclo_id = ' . $cicloFiltro : '');
+        $sql = 'SELECT g.id_grupo, g.grado, g.maestra_id, g.ciclo_id, g.nivel, ci.nombre AS ciclo_nombre,
+                       (SELECT COUNT(*) FROM materia m WHERE m.grupo_id = g.id_grupo) AS num_materias,
+                       (SELECT COUNT(*) FROM cuenta cu WHERE cu.grupo_id = g.id_grupo AND cu.permiso_id = 3) AS num_alumnos
                 FROM grupo g
-                ORDER BY g.grado';
+                LEFT JOIN ciclo ci ON ci.id_ciclo = g.ciclo_id'
+                . $where . '
+                ORDER BY g.nivel, g.grado';
         $res = mysqli_query($conexion, $sql);
         $grupos = [];
         while ($row = mysqli_fetch_assoc($res)) $grupos[] = $row;
@@ -212,12 +219,19 @@ switch ($action) {
         if ($gid <= 0) response(400, false, 'Grupo no válido.');
 
         // Datos del grupo
-        $gs = mysqli_prepare($conexion, 'SELECT id_grupo, grado, maestra_id FROM grupo WHERE id_grupo = ? LIMIT 1');
+        $gs = mysqli_prepare($conexion, 'SELECT id_grupo, grado, maestra_id, ciclo_id, nivel FROM grupo WHERE id_grupo = ? LIMIT 1');
         mysqli_stmt_bind_param($gs, 'i', $gid);
         mysqli_stmt_execute($gs);
         $grupo = mysqli_fetch_assoc(mysqli_stmt_get_result($gs));
         mysqli_stmt_close($gs);
         if (!$grupo) response(404, false, 'No se encontró el grupo.');
+
+        // Ciclos disponibles (para el select)
+        $ciclos = [];
+        $resC = mysqli_query($conexion,
+            'SELECT c.id_ciclo, c.nombre, (s.clave = "activo") AS activo
+             FROM ciclo c LEFT JOIN status s ON s.id_status = c.status_id ORDER BY c.fecha_inicio DESC');
+        while ($r = mysqli_fetch_assoc($resC)) $ciclos[] = $r;
 
         // Materias del grupo
         $ms = mysqli_prepare($conexion, 'SELECT id_materia, nombre FROM materia WHERE grupo_id = ? ORDER BY nombre');
@@ -242,24 +256,32 @@ switch ($action) {
             'grupo'    => $grupo,
             'materias' => $materias,
             'maestros' => $maestros,
+            'ciclos'   => $ciclos,
         ]);
         break;
 
     case 'grupo_crear':
         $grado    = trim($_POST['grado'] ?? '');
+        $cicloId  = (int) ($_POST['ciclo_id'] ?? 0) ?: null;
+        $nivel    = ($_POST['nivel'] ?? '') === '' ? null : (int) $_POST['nivel'];
         $materias = json_decode($_POST['materias'] ?? '[]', true) ?: [];
         if ($grado === '')     response(400, false, 'Indica el grado del grupo.');
         if (empty($materias))  response(400, false, 'Agrega al menos una materia.');
 
-        // ¿grado ya existe?
-        $chk = mysqli_prepare($conexion, 'SELECT 1 FROM grupo WHERE grado = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 's', $grado);
+        // ¿grado ya existe en ese ciclo? (el mismo grado puede repetirse en otro ciclo)
+        if ($cicloId) {
+            $chk = mysqli_prepare($conexion, 'SELECT 1 FROM grupo WHERE grado = ? AND ciclo_id = ? LIMIT 1');
+            mysqli_stmt_bind_param($chk, 'si', $grado, $cicloId);
+        } else {
+            $chk = mysqli_prepare($conexion, 'SELECT 1 FROM grupo WHERE grado = ? AND ciclo_id IS NULL LIMIT 1');
+            mysqli_stmt_bind_param($chk, 's', $grado);
+        }
         mysqli_stmt_execute($chk);
-        if (mysqli_fetch_row(mysqli_stmt_get_result($chk))) response(409, false, 'Ya existe ese grupo.');
+        if (mysqli_fetch_row(mysqli_stmt_get_result($chk))) response(409, false, 'Ya existe ese grupo en el ciclo seleccionado.');
         mysqli_stmt_close($chk);
 
-        $g = mysqli_prepare($conexion, 'INSERT INTO grupo (grado) VALUES (?)');
-        mysqli_stmt_bind_param($g, 's', $grado);
+        $g = mysqli_prepare($conexion, 'INSERT INTO grupo (grado, ciclo_id, nivel) VALUES (?, ?, ?)');
+        mysqli_stmt_bind_param($g, 'sii', $grado, $cicloId, $nivel);
         if (!mysqli_stmt_execute($g)) response(500, false, 'No se pudo crear el grupo.');
         $grupoId = mysqli_insert_id($conexion);
         mysqli_stmt_close($g);
@@ -299,6 +321,18 @@ switch ($action) {
             mysqli_stmt_bind_param($s, 'ii', $mid, $grupoId);
             mysqli_stmt_execute($s); mysqli_stmt_close($s); $cambios++;
         }
+        if (isset($_POST['nivel']) && $_POST['nivel'] !== '') {
+            $niv = (int) $_POST['nivel'];
+            $s = mysqli_prepare($conexion, 'UPDATE grupo SET nivel = ? WHERE id_grupo = ?');
+            mysqli_stmt_bind_param($s, 'ii', $niv, $grupoId);
+            mysqli_stmt_execute($s); mysqli_stmt_close($s); $cambios++;
+        }
+        if (isset($_POST['ciclo_id']) && $_POST['ciclo_id'] !== '') {
+            $cid = (int) $_POST['ciclo_id'];
+            $s = mysqli_prepare($conexion, 'UPDATE grupo SET ciclo_id = ? WHERE id_grupo = ?');
+            mysqli_stmt_bind_param($s, 'ii', $cid, $grupoId);
+            mysqli_stmt_execute($s); mysqli_stmt_close($s); $cambios++;
+        }
         if (!empty($materiasAdd)) {
             $ins = mysqli_prepare($conexion, 'INSERT INTO materia (nombre, grupo_id) VALUES (?, ?)');
             foreach ($materiasAdd as $nombreMat) {
@@ -328,12 +362,20 @@ switch ($action) {
         $grupoId = (int) ($_POST['id_grupo'] ?? 0);
         if ($grupoId <= 0) response(400, false, 'Grupo no válido.');
 
+        // "Sin grupo" (grupo_id = 0) es un comodín de migración: al disolver el grupo,
+        // sus alumnos quedan ahí (marcados en rojo) hasta reasignarlos a otro grupo.
+        $cnt = mysqli_prepare($conexion, 'SELECT COUNT(*) FROM cuenta WHERE grupo_id = ? AND permiso_id = 3');
+        mysqli_stmt_bind_param($cnt, 'i', $grupoId);
+        mysqli_stmt_execute($cnt);
+        $nAlumnos = (int) (mysqli_fetch_row(mysqli_stmt_get_result($cnt))[0] ?? 0);
+        mysqli_stmt_close($cnt);
+
         $d1 = mysqli_prepare($conexion, 'DELETE FROM materia WHERE grupo_id = ?');
         mysqli_stmt_bind_param($d1, 'i', $grupoId);
         mysqli_stmt_execute($d1);
         mysqli_stmt_close($d1);
 
-        // Desasignar alumnos/maestros de este grupo (evita cuentas colgadas)
+        // Mandar alumnos y maestros del grupo a "Sin grupo" (comodín)
         $up = mysqli_prepare($conexion, 'UPDATE cuenta SET grupo_id = 0 WHERE grupo_id = ?');
         mysqli_stmt_bind_param($up, 'i', $grupoId);
         mysqli_stmt_execute($up);
@@ -346,7 +388,9 @@ switch ($action) {
         mysqli_stmt_close($d2);
 
         if ($afectadas === 0) response(404, false, 'No se encontró el grupo.');
-        response(200, true, 'Se ha eliminado el grupo y sus materias.');
+        $msg = 'Se ha eliminado el grupo y sus materias.';
+        if ($nAlumnos > 0) $msg .= " $nAlumnos alumno(s) quedaron en «Sin grupo» — reasígnalos pronto.";
+        response(200, true, $msg);
         break;
 
     default:
