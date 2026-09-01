@@ -25,6 +25,9 @@ $routes = [
     'tipos-descuento'   => dirname(__DIR__) . '/webService/actions/tipos_descuento.php',
     'materias'          => dirname(__DIR__) . '/webService/actions/materias.php',
     'ciclos'            => dirname(__DIR__) . '/webService/actions/ciclos.php',
+    'perfiles'          => dirname(__DIR__) . '/webService/actions/perfiles.php',
+    'permisos'          => dirname(__DIR__) . '/webService/actions/permisos.php',
+    'tablas'            => dirname(__DIR__) . '/webService/actions/tablas.php',
 ];
 
 if (array_key_exists($route, $routes)) {

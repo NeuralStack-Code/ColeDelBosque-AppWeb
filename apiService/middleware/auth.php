@@ -25,3 +25,10 @@ function requireAdmin(): void {
         response(403, false, 'No tienes permisos de administrador.');
     }
 }
+
+function requireDev(): void {
+    requireAuth();
+    if ((int)($_SESSION['permiso'] ?? 0) !== 4) {
+        response(403, false, 'Solo el desarrollador puede realizar esta acción.');
+    }
+}

@@ -160,7 +160,7 @@ $img = $base . '/webService/wwwroot/img';
         });
 
         async function eliminar(m) {
-            if (!await window.confirmar(`¿Eliminar a ${m.nombre} ${m.paterno}? Esta acción no se puede deshacer.`)) return;
+            if (!await window.confirmar(`¿Eliminar a ${m.nombre} ${m.paterno}? Se desasignará de su grupo y se borrarán sus registros. Esta acción no se puede deshacer.`)) return;
             const fd = new FormData(); fd.append('id_cuenta', m.id_cuenta);
             const d = await (await fetch(API + '?action=maestro_eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);

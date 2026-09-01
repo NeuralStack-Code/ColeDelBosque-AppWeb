@@ -170,7 +170,7 @@ $img = $base . '/webService/wwwroot/img';
         });
 
         async function eliminar(a) {
-            if (!await window.confirmar(`¿Eliminar a ${a.nombre} ${a.paterno}? Esta acción no se puede deshacer.`)) return;
+            if (!await window.confirmar(`¿Eliminar a ${a.nombre} ${a.paterno}? Se borrarán también sus colegiaturas, calificaciones y recibos. Esta acción no se puede deshacer.`)) return;
             const fd = new FormData(); fd.append('id_cuenta', a.id_cuenta);
             const d = await (await fetch(API + '?action=alumno_eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);

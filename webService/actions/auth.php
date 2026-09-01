@@ -49,8 +49,9 @@ switch ($action) {
         // Destino según nivel
         $destinos = [
             1 => BASE_URL . '/administrador',
-            2 => BASE_URL . '/maestro',   // TODO: crear ruta/vista de maestro
-            3 => BASE_URL . '/padre',     // TODO: crear ruta/vista de padre
+            2 => BASE_URL . '/maestro',
+            3 => BASE_URL . '/padre',
+            4 => BASE_URL . '/desarrollador',
         ];
         $redirect = $destinos[$permiso] ?? BASE_URL . '/';
 

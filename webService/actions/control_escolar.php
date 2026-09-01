@@ -131,7 +131,7 @@ function editarPersona(mysqli $conexion): void {
     response(200, true, 'Se ha actualizado la información.');
 }
 
-/** Baja de persona: elimina cuenta y su usuario. */
+/** Baja de persona: elimina sus datos relacionados, la cuenta y el usuario. */
 function eliminarPersona(mysqli $conexion): void {
     $id = (int) ($_POST['id_cuenta'] ?? 0);
     if ($id <= 0) response(400, false, 'Registro no válido.');
@@ -144,17 +144,39 @@ function eliminarPersona(mysqli $conexion): void {
     if (!$row) response(404, false, 'No se encontró el registro.');
     $usuarioId = (int) $row['usuario_id'];
 
-    $d1 = mysqli_prepare($conexion, 'DELETE FROM cuenta WHERE id_cuenta = ?');
-    mysqli_stmt_bind_param($d1, 'i', $id);
-    mysqli_stmt_execute($d1);
-    mysqli_stmt_close($d1);
+    eliminarCuentaEnCascada($conexion, $id, $usuarioId);
+    response(200, true, 'Se ha eliminado el registro y sus datos relacionados.');
+}
 
-    $d2 = mysqli_prepare($conexion, 'DELETE FROM usuario WHERE id_usuario = ?');
-    mysqli_stmt_bind_param($d2, 'i', $usuarioId);
-    mysqli_stmt_execute($d2);
-    mysqli_stmt_close($d2);
-
-    response(200, true, 'Se ha eliminado el registro.');
+/**
+ * Borra una cuenta con todo lo que cuelga de ella (recibos, colegiaturas,
+ * calificaciones) dentro de una transacción, evitando el choque con las FK.
+ * También desasigna al maestro de cualquier grupo.
+ */
+function eliminarCuentaEnCascada(mysqli $conexion, int $idCuenta, int $usuarioId): void {
+    try {
+        mysqli_begin_transaction($conexion);
+        foreach ([
+            'DELETE FROM recibo       WHERE cuenta_id = ?',
+            'DELETE FROM colegiatura  WHERE cuenta_id = ?',
+            'DELETE FROM calificacion WHERE cuenta_id = ?',
+            'UPDATE grupo SET maestra_id = NULL WHERE maestra_id = ?',
+            'DELETE FROM cuenta       WHERE id_cuenta = ?',
+        ] as $sql) {
+            $st = mysqli_prepare($conexion, $sql);
+            mysqli_stmt_bind_param($st, 'i', $idCuenta);
+            mysqli_stmt_execute($st);
+            mysqli_stmt_close($st);
+        }
+        $st = mysqli_prepare($conexion, 'DELETE FROM usuario WHERE id_usuario = ?');
+        mysqli_stmt_bind_param($st, 'i', $usuarioId);
+        mysqli_stmt_execute($st);
+        mysqli_stmt_close($st);
+        mysqli_commit($conexion);
+    } catch (\Throwable $e) {
+        mysqli_rollback($conexion);
+        response(500, false, 'No se pudo eliminar: hay datos relacionados que lo impiden.');
+    }
 }
 
 /** Lista cuentas por permiso (2=maestros, 3=alumnos) con matrícula desencriptada. */
@@ -202,7 +224,7 @@ switch ($action) {
         // id_grupo = 0 es un bucket fantasma "Sin grupo": nunca debe ofrecerse como grupo real.
         $where = ' WHERE g.id_grupo <> 0' . ($cicloFiltro > 0 ? ' AND g.ciclo_id = ' . $cicloFiltro : '');
         $sql = 'SELECT g.id_grupo, g.grado, g.maestra_id, g.ciclo_id, g.nivel, ci.nombre AS ciclo_nombre,
-                       (SELECT COUNT(*) FROM materia m WHERE m.grupo_id = g.id_grupo) AS num_materias,
+                       (SELECT COUNT(*) FROM grupo_materia gm WHERE gm.id_grupo = g.id_grupo) AS num_materias,
                        (SELECT COUNT(*) FROM cuenta cu WHERE cu.grupo_id = g.id_grupo AND cu.permiso_id = 3) AS num_alumnos
                 FROM grupo g
                 LEFT JOIN ciclo ci ON ci.id_ciclo = g.ciclo_id'

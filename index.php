@@ -58,12 +58,26 @@ $routes = [
     'administrador/tipos-descuento' => __DIR__ . '/webService/views/admin/tipos_descuento.php',
     'administrador/materias'      => __DIR__ . '/webService/views/admin/materias.php',
     'administrador/ciclos'        => __DIR__ . '/webService/views/admin/ciclos.php',
+
+    //Desarrollador (permiso_id = 4)
+    'desarrollador'            => __DIR__ . '/webService/views/dev/home.php',
+    'desarrollador/perfiles'   => __DIR__ . '/webService/views/dev/perfiles.php',
+    'desarrollador/permisos'   => __DIR__ . '/webService/views/dev/permisos.php',
+    'desarrollador/tablas'     => __DIR__ . '/webService/views/dev/tablas.php',
 ];
 
 // Admin encerrado en su panel: solo puede navegar rutas 'administrador' y 'administrador/*' (+ recibo)
 if (isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 1) {
     if ($route !== 'administrador' && strpos($route, 'administrador/') !== 0 && $route !== 'recibo') {
         header('Location: ' . BASE_URL . '/administrador');
+        exit;
+    }
+}
+
+// Desarrollador encerrado en su panel: solo 'desarrollador' y 'desarrollador/*'
+if (isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 4) {
+    if ($route !== 'desarrollador' && strpos($route, 'desarrollador/') !== 0) {
+        header('Location: ' . BASE_URL . '/desarrollador');
         exit;
     }
 }
