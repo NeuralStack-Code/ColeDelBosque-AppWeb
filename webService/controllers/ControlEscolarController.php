@@ -1,0 +1,187 @@
+<?php
+
+/**
+ * Recurso: control-escolar.  Ruta: /api/control-escolar?action=...
+ * CRUD de Alumnos (3), Maestros (2) y Grupos/Materias (solo admin).
+ */
+class ControlEscolarController
+{
+    private ControlEscolarBusiness $ce;
+
+    public function __construct(mysqli $conexion)
+    {
+        requireAdmin();
+        $this->ce = new ControlEscolarBusiness($conexion);
+    }
+
+    /* ---------------- Helpers de validación ---------------- */
+
+    private function validarNombres(string $nombre, string $paterno, string $materno): void
+    {
+        foreach (['nombre' => $nombre, 'apellido paterno' => $paterno, 'apellido materno' => $materno] as $campo => $val) {
+            if ($val === '')      response(400, false, "El $campo no puede estar vacío.");
+            if (is_numeric($val)) response(400, false, "Revisa el $campo.");
+        }
+    }
+
+    /** La matrícula debe ser 3 mayúsculas + 6 números (AAA######). */
+    private function matriculaValida(string $m): bool
+    {
+        return (bool) preg_match('/^[A-Z]{3}[0-9]{6}$/', $m);
+    }
+
+    private function crearPersona(int $permiso): void
+    {
+        $nombre  = trim($_POST['nombre']  ?? '');
+        $paterno = trim($_POST['paterno'] ?? '');
+        $materno = trim($_POST['materno'] ?? '');
+        $grupo   = (int) ($_POST['grado'] ?? 0);
+        $mat     = trim($_POST['matricula'] ?? '');
+
+        if ($grupo <= 0) response(400, false, 'Selecciona un grupo válido.');
+        $this->validarNombres($nombre, $paterno, $materno);
+        if (!$this->matriculaValida($mat)) response(400, false, 'La matrícula debe tener 3 mayúsculas y 6 números (AAA######).');
+        if ($this->ce->matriculaExiste($mat)) response(409, false, 'La matrícula ya existe.');
+
+        if (!$this->ce->crearPersona($nombre, $paterno, $materno, $grupo, $mat, $permiso)) {
+            response(500, false, 'No se pudo crear la cuenta.');
+        }
+        $etiqueta = $permiso === 2 ? 'maestro' : 'alumno';
+        response(201, true, "¡Se ha registrado un nuevo $etiqueta!");
+    }
+
+    private function editarPersona(): void
+    {
+        $id      = (int) ($_POST['id_cuenta'] ?? 0);
+        $nombre  = trim($_POST['nombre']  ?? '');
+        $paterno = trim($_POST['paterno'] ?? '');
+        $materno = trim($_POST['materno'] ?? '');
+        $grado   = (int) ($_POST['grado'] ?? 0);   // 0 = no cambiar grupo
+        $mat     = trim($_POST['matricula'] ?? '');
+
+        if ($id <= 0) response(400, false, 'Registro no válido.');
+        $this->validarNombres($nombre, $paterno, $materno);
+        if (!$this->matriculaValida($mat)) response(400, false, 'La matrícula debe tener 3 mayúsculas y 6 números (AAA######).');
+
+        $usuarioId = $this->ce->obtenerUsuarioId($id);
+        if ($usuarioId === null) response(404, false, 'No se encontró la cuenta.');
+
+        if (!$this->ce->editarPersona($id, $usuarioId, $nombre, $paterno, $materno, $grado, $mat)) {
+            response(500, false, 'No se pudo actualizar la cuenta.');
+        }
+        response(200, true, 'Se ha actualizado la información.');
+    }
+
+    private function eliminarPersona(): void
+    {
+        $id = (int) ($_POST['id_cuenta'] ?? 0);
+        if ($id <= 0) response(400, false, 'Registro no válido.');
+
+        $usuarioId = $this->ce->obtenerUsuarioId($id);
+        if ($usuarioId === null) response(404, false, 'No se encontró el registro.');
+
+        if (!$this->ce->eliminarCuentaEnCascada($id, $usuarioId)) {
+            response(500, false, 'No se pudo eliminar: hay datos relacionados que lo impiden.');
+        }
+        response(200, true, 'Se ha eliminado el registro y sus datos relacionados.');
+    }
+
+    /* ---------------- Alumnos (permiso 3) ---------------- */
+    public function alumnos_listar(): void  { response(200, true, 'Listado obtenido.', ['items' => $this->ce->listarPersonas(3)]); }
+    public function alumno_crear(): void    { $this->crearPersona(3); }
+    public function alumno_editar(): void   { $this->editarPersona(); }
+    public function alumno_eliminar(): void { $this->eliminarPersona(); }
+
+    /* ---------------- Maestros (permiso 2) ---------------- */
+    public function maestros_listar(): void  { response(200, true, 'Listado obtenido.', ['items' => $this->ce->listarPersonas(2)]); }
+    public function maestro_crear(): void    { $this->crearPersona(2); }
+    public function maestro_editar(): void   { $this->editarPersona(); }
+    public function maestro_eliminar(): void { $this->eliminarPersona(); }
+
+    /* ---------------- Grupos ---------------- */
+    public function grupos_listar(): void
+    {
+        $cicloFiltro = (int) ($_GET['ciclo_id'] ?? 0);
+        response(200, true, 'Grupos obtenidos.', ['items' => $this->ce->gruposListar($cicloFiltro)]);
+    }
+
+    public function grupo_detalle(): void
+    {
+        $gid = (int) ($_GET['id_grupo'] ?? 0);
+        if ($gid <= 0) response(400, false, 'Grupo no válido.');
+
+        $grupo = $this->ce->grupoBasico($gid);
+        if (!$grupo) response(404, false, 'No se encontró el grupo.');
+
+        response(200, true, 'Detalle del grupo.', [
+            'grupo'    => $grupo,
+            'materias' => $this->ce->materiasDeGrupo($gid),
+            'catalogo' => $this->ce->catalogoMaterias(),
+            'maestros' => $this->ce->maestrosParaSelect(),
+            'ciclos'   => $this->ce->ciclosParaSelect(),
+        ]);
+    }
+
+    public function grupo_crear(): void
+    {
+        $grado   = trim($_POST['grado'] ?? '');
+        $cicloId = (int) ($_POST['ciclo_id'] ?? 0) ?: null;
+        $nivel   = ($_POST['nivel'] ?? '') === '' ? null : (int) $_POST['nivel'];
+        $materiaIds = $this->ce->resolverMaterias(
+            json_decode($_POST['materia_ids'] ?? '[]', true) ?: [],
+            json_decode($_POST['materias_nuevas'] ?? '[]', true) ?: []
+        );
+        if ($grado === '')      response(400, false, 'Indica el grado del grupo.');
+        if (empty($materiaIds)) response(400, false, 'Agrega al menos una materia.');
+        if ($this->ce->gradoExisteEnCiclo($grado, $cicloId)) response(409, false, 'Ya existe ese grupo en el ciclo seleccionado.');
+
+        $grupoId = $this->ce->grupoCrear($grado, $cicloId, $nivel);
+        if ($grupoId <= 0) response(500, false, 'No se pudo crear el grupo.');
+
+        $this->ce->sincronizarMateriasGrupo($grupoId, $materiaIds);
+        response(201, true, '¡Se ha creado el grupo y sus materias!');
+    }
+
+    public function grupo_editar(): void
+    {
+        $grupoId = (int) ($_POST['id_grupo'] ?? 0);
+        if ($grupoId <= 0) response(400, false, 'Grupo no válido.');
+        $cambios = 0;
+
+        $nuevoGrado = trim($_POST['grado'] ?? '');
+        if ($nuevoGrado !== '') { $this->ce->grupoSetGrado($grupoId, $nuevoGrado); $cambios++; }
+
+        $maestraId = $_POST['maestra_id'] ?? null;
+        if ($maestraId !== null && $maestraId !== '') { $this->ce->grupoSetMaestra($grupoId, (int) $maestraId); $cambios++; }
+
+        if (isset($_POST['nivel']) && $_POST['nivel'] !== '')       { $this->ce->grupoSetNivel($grupoId, (int) $_POST['nivel']); $cambios++; }
+        if (isset($_POST['ciclo_id']) && $_POST['ciclo_id'] !== '') { $this->ce->grupoSetCiclo($grupoId, (int) $_POST['ciclo_id']); $cambios++; }
+
+        if (isset($_POST['materia_ids']) || isset($_POST['materias_nuevas'])) {
+            $materiaIds = $this->ce->resolverMaterias(
+                json_decode($_POST['materia_ids'] ?? '[]', true) ?: [],
+                json_decode($_POST['materias_nuevas'] ?? '[]', true) ?: []
+            );
+            $this->ce->sincronizarMateriasGrupo($grupoId, $materiaIds);
+            $cambios++;
+        }
+
+        if ($cambios === 0) response(400, false, 'No hay cambios que aplicar.');
+        response(200, true, 'Se han aplicado los cambios al grupo.');
+    }
+
+    public function grupo_eliminar(): void
+    {
+        $grupoId = (int) ($_POST['id_grupo'] ?? 0);
+        if ($grupoId <= 0) response(400, false, 'Grupo no válido.');
+
+        $nAlumnos = $this->ce->contarAlumnosDeGrupo($grupoId);
+        $this->ce->moverAlumnosASinGrupo($grupoId);
+        $af = $this->ce->grupoEliminar($grupoId);
+
+        if ($af === 0) response(404, false, 'No se encontró el grupo.');
+        $msg = 'Se ha eliminado el grupo y sus materias.';
+        if ($nAlumnos > 0) $msg .= " $nAlumnos alumno(s) quedaron en «Sin grupo» — reasígnalos pronto.";
+        response(200, true, $msg);
+    }
+}

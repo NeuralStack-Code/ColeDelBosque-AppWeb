@@ -62,9 +62,11 @@ $img = $base . '/webService/wwwroot/img';
                 </div>
 
                 <div class="campo">
-                    <label>Materias</label>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="materiaInput" placeholder="Nombre de la materia">
+                    <label>Materias del grupo</label>
+                    <div class="chips" id="materiasCheck" style="flex-direction:column;align-items:stretch;gap:6px;max-height:200px;overflow:auto;"></div>
+                    <small id="sinCatalogo" style="color:var(--texto-suave);display:none;">Aún no hay materias en el catálogo.</small>
+                    <div style="display:flex;gap:8px;margin-top:10px;">
+                        <input type="text" id="materiaInput" placeholder="Agregar materia nueva…">
                         <button type="button" class="btn btn-fantasma" onclick="agregarMateria()">Agregar</button>
                     </div>
                     <div class="chips" id="chips"></div>
@@ -86,9 +88,8 @@ $img = $base . '/webService/wwwroot/img';
         const form = document.getElementById('form');
         const chips = document.getElementById('chips');
 
-        let materiasNuevas = [];      // nombres a insertar
-        let materiasExistentes = [];  // {id_materia, nombre} (modo edición)
-        let materiasEliminar = [];    // ids a borrar
+        let materiasNuevas = [];        // nombres nuevos a crear + vincular
+        let catalogoMaterias = [];      // {id_materia, nombre} catálogo completo
 
         function cerrarSesion() {
             fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
@@ -131,35 +132,48 @@ $img = $base . '/webService/wwwroot/img';
             });
         }
 
-        function pintarChips() {
-            chips.innerHTML = '';
-            materiasExistentes.forEach(m => chips.appendChild(chip(m.nombre, () => {
-                materiasEliminar.push(m.id_materia);
-                materiasExistentes = materiasExistentes.filter(x => x !== m);
-                pintarChips();
-            })));
-            materiasNuevas.forEach((nombre, i) => chips.appendChild(chip(nombre + ' (nueva)', () => {
-                materiasNuevas.splice(i, 1); pintarChips();
-            })));
+        async function cargarCatalogo() {
+            const d = await (await fetch(window.BASE_URL + '/api/materias?action=listar')).json();
+            catalogoMaterias = (d.items || []).map(m => ({ id_materia: m.id_materia, nombre: m.nombre }));
         }
-        function chip(texto, onDel) {
-            const el = document.createElement('span');
-            el.className = 'chip';
-            el.innerHTML = `${texto} <button type="button">✕</button>`;
-            el.querySelector('button').addEventListener('click', onDel);
-            return el;
+
+        function pintarChecklist(seleccionados = []) {
+            const cont = document.getElementById('materiasCheck');
+            const sel = new Set(seleccionados.map(Number));
+            document.getElementById('sinCatalogo').style.display = catalogoMaterias.length ? 'none' : 'block';
+            cont.innerHTML = catalogoMaterias.map(m => `
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" value="${m.id_materia}" ${sel.has(Number(m.id_materia)) ? 'checked' : ''}>
+                    <span>${m.nombre}</span>
+                </label>`).join('');
+        }
+        function materiasMarcadas() {
+            return [...document.querySelectorAll('#materiasCheck input:checked')].map(c => Number(c.value));
+        }
+
+        function pintarChipsNuevas() {
+            chips.innerHTML = '';
+            materiasNuevas.forEach((nombre, i) => {
+                const el = document.createElement('span');
+                el.className = 'chip';
+                el.innerHTML = `${nombre} (nueva) <button type="button">✕</button>`;
+                el.querySelector('button').addEventListener('click', () => { materiasNuevas.splice(i, 1); pintarChipsNuevas(); });
+                chips.appendChild(el);
+            });
         }
         function agregarMateria() {
             const v = document.getElementById('materiaInput').value.trim();
             if (!v) return;
             materiasNuevas.push(v);
             document.getElementById('materiaInput').value = '';
-            pintarChips();
+            pintarChipsNuevas();
         }
 
         function reset() {
-            materiasNuevas = []; materiasExistentes = []; materiasEliminar = [];
-            form.reset(); pintarChips();
+            materiasNuevas = [];
+            form.reset();
+            pintarChecklist([]);
+            pintarChipsNuevas();
         }
 
         function abrirAlta() {
@@ -181,14 +195,16 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('grado').value = d.grupo.grado;
             document.getElementById('ciclo_id').value = d.grupo.ciclo_id ?? '';
             document.getElementById('nivel').value = d.grupo.nivel ?? '';
-            materiasExistentes = d.materias.slice();
+            catalogoMaterias = (d.catalogo || catalogoMaterias);
+            materiasNuevas = [];
+            pintarChecklist((d.materias || []).map(m => m.id_materia));
+            pintarChipsNuevas();
             // maestra select
             const sel = document.getElementById('maestra');
             sel.innerHTML = '<option value="">Sin asignar</option>' +
                 d.maestros.map(m => `<option value="${m.id_cuenta}">${m.nombre}</option>`).join('');
             sel.value = d.grupo.maestra_id ?? '';
             document.getElementById('campoMaestra').style.display = 'block';
-            pintarChips();
             modal.showModal();
         }
 
@@ -198,19 +214,18 @@ $img = $base . '/webService/wwwroot/img';
             const fd = new FormData();
             fd.append('ciclo_id', document.getElementById('ciclo_id').value);
             fd.append('nivel', document.getElementById('nivel').value);
+            fd.append('materia_ids', JSON.stringify(materiasMarcadas()));
+            fd.append('materias_nuevas', JSON.stringify(materiasNuevas));
             if (id) {
                 fd.append('id_grupo', id);
                 fd.append('grado', document.getElementById('grado').value);
                 fd.append('maestra_id', document.getElementById('maestra').value);
-                fd.append('materias', JSON.stringify(materiasNuevas));
-                fd.append('materiasEliminar', JSON.stringify(materiasEliminar.map(x => ({ id: x }))));
                 const r = await fetch(API + '?action=grupo_editar', { method: 'POST', body: fd });
                 const d = await r.json();
                 window.notifyResponse(d);
                 if (d.success) { modal.close(); cargar(); }
             } else {
                 fd.append('grado', document.getElementById('grado').value);
-                fd.append('materias', JSON.stringify(materiasNuevas));
                 const r = await fetch(API + '?action=grupo_crear', { method: 'POST', body: fd });
                 const d = await r.json();
                 window.notifyResponse(d);
@@ -222,7 +237,7 @@ $img = $base . '/webService/wwwroot/img';
             const n = Number(g.num_alumnos || 0);
             const aviso = n > 0
                 ? `¿Eliminar el grupo "${g.grado}"? Sus ${n} alumno(s) quedarán en «Sin grupo» hasta que los reasignes.`
-                : `¿Eliminar el grupo "${g.grado}" y todas sus materias?`;
+                : `¿Eliminar el grupo "${g.grado}"? Las materias del catálogo no se borran.`;
             if (!await window.confirmar(aviso)) return;
             const fd = new FormData();
             fd.append('id_grupo', g.id_grupo);
@@ -234,7 +249,7 @@ $img = $base . '/webService/wwwroot/img';
 
         document.getElementById('fCiclo').addEventListener('change', cargar);
 
-        (async () => { await cargarCiclos(); cargar(); })();
+        (async () => { await Promise.all([cargarCiclos(), cargarCatalogo()]); cargar(); })();
     </script>
 </body>
 </html>

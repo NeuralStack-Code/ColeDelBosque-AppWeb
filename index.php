@@ -7,6 +7,7 @@ if (php_sapi_name() === 'cli-server') {
 }
 
 session_start();
+require_once __DIR__ . '/apiService/core/autoload.php';
 require_once __DIR__ . '/apiService/core/config.php';
 require_once __DIR__ . '/apiService/core/checkLicense.php';
 checkLicense();

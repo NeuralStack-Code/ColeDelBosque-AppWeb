@@ -32,6 +32,7 @@ $img = $base . '/webService/wwwroot/img';
             <h2>Materias</h2>
             <button class="btn btn-primario" onclick="abrirAlta()">+ Nueva materia</button>
         </div>
+        <p class="sub" style="color:var(--texto-suave);margin:-6px 0 18px;">Una materia puede estar en varios grupos.</p>
 
         <div class="filtros">
             <div class="f buscar"><label>Buscar</label><input type="text" id="fBuscar" placeholder="Nombre de materia…"></div>
@@ -40,7 +41,7 @@ $img = $base . '/webService/wwwroot/img';
 
         <div class="tabla-scroll">
             <table class="tabla">
-                <thead><tr><th>Materia</th><th>Grupo</th><th></th></tr></thead>
+                <thead><tr><th>Materia</th><th>Grupos</th><th></th></tr></thead>
                 <tbody id="filas"></tbody>
             </table>
         </div>
@@ -53,7 +54,11 @@ $img = $base . '/webService/wwwroot/img';
             <form id="form">
                 <input type="hidden" id="id_materia">
                 <div class="campo"><label>Nombre</label><input type="text" id="nombre" placeholder="Ej. Matemáticas" required></div>
-                <div class="campo"><label>Grupo</label><select id="grupo_id" required></select></div>
+                <div class="campo">
+                    <label>Grupos donde se imparte</label>
+                    <div class="chips" id="gruposCheck" style="flex-direction:column;align-items:stretch;gap:6px;max-height:220px;overflow:auto;"></div>
+                    <small id="sinGrupos" style="color:var(--texto-suave);display:none;">No hay grupos aún.</small>
+                </div>
                 <div class="modal-acciones">
                     <button type="button" class="btn btn-fantasma" onclick="modal.close()">Cancelar</button>
                     <button type="submit" class="btn btn-primario">Guardar</button>
@@ -79,9 +84,22 @@ $img = $base . '/webService/wwwroot/img';
         async function cargarGrupos() {
             const d = await (await fetch(APIG + '?action=grupos_listar')).json();
             grupos = d.items || [];
-            const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
-            document.getElementById('grupo_id').innerHTML = opts || '<option value="">Sin grupos</option>';
-            document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' + opts;
+            document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' +
+                grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
+        }
+
+        function pintarChecklist(seleccionados = []) {
+            const cont = document.getElementById('gruposCheck');
+            const sel = new Set(seleccionados.map(Number));
+            document.getElementById('sinGrupos').style.display = grupos.length ? 'none' : 'block';
+            cont.innerHTML = grupos.map(g => `
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" value="${g.id_grupo}" ${sel.has(Number(g.id_grupo)) ? 'checked' : ''}>
+                    <span>${g.grado}${g.ciclo_nombre ? ' · ' + g.ciclo_nombre : ''}</span>
+                </label>`).join('');
+        }
+        function gruposMarcados() {
+            return [...document.querySelectorAll('#gruposCheck input:checked')].map(c => Number(c.value));
         }
 
         async function cargar() {
@@ -95,16 +113,18 @@ $img = $base . '/webService/wwwroot/img';
             const grp = document.getElementById('fGrupo').value;
             const f = todos.filter(m => {
                 if (q && !(m.nombre || '').toLowerCase().includes(q)) return false;
-                if (grp && String(m.grupo_id) !== grp) return false;
+                if (grp && !(m.grupo_ids || []).includes(Number(grp))) return false;
                 return true;
             });
             filas.innerHTML = '';
             vacio.style.display = f.length ? 'none' : 'block';
             f.forEach(m => {
+                const chips = (m.grupos_txt || '').split(', ').filter(Boolean)
+                    .map(g => `<span class="chip">${g}</span>`).join(' ') || '<span class="pill-sin">Sin grupos</span>';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td><strong>${m.nombre}</strong></td>
-                    <td>${m.grado ?? '—'}</td>
+                    <td><div class="chips">${chips}</div></td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
@@ -118,13 +138,15 @@ $img = $base . '/webService/wwwroot/img';
 
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nueva materia';
-            form.reset(); document.getElementById('id_materia').value = ''; modal.showModal();
+            form.reset(); document.getElementById('id_materia').value = '';
+            pintarChecklist([]);
+            modal.showModal();
         }
         function abrirEdicion(m) {
             document.getElementById('modalTitulo').textContent = 'Editar materia';
             document.getElementById('id_materia').value = m.id_materia;
             document.getElementById('nombre').value = m.nombre;
-            document.getElementById('grupo_id').value = m.grupo_id ?? '';
+            pintarChecklist(m.grupo_ids || []);
             modal.showModal();
         }
 
@@ -133,7 +155,7 @@ $img = $base . '/webService/wwwroot/img';
             const id = document.getElementById('id_materia').value;
             const fd = new FormData();
             fd.append('nombre', document.getElementById('nombre').value);
-            fd.append('grupo_id', document.getElementById('grupo_id').value);
+            fd.append('grupos', JSON.stringify(gruposMarcados()));
             let accion = 'crear';
             if (id) { accion = 'editar'; fd.append('id_materia', id); }
             const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
@@ -142,15 +164,14 @@ $img = $base . '/webService/wwwroot/img';
         });
 
         async function eliminar(m) {
-            if (!await window.confirmar(`¿Eliminar la materia "${m.nombre}"?`)) return;
+            if (!await window.confirmar(`¿Eliminar la materia "${m.nombre}"? Se quitará de todos sus grupos.`)) return;
             const fd = new FormData(); fd.append('id_materia', m.id_materia);
             const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargar();
         }
 
-        cargarGrupos();
-        cargar();
+        (async () => { await cargarGrupos(); cargar(); })();
     </script>
 </body>
 </html>
