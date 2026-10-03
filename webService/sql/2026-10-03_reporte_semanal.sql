@@ -24,7 +24,7 @@ INSERT INTO reporte_columna (nombre, tipo, etiqueta, orden)
 SELECT t.nombre, t.tipo, t.etiqueta, t.orden FROM (
     SELECT 'Material / Entregas' AS nombre, 'casilla' AS tipo, 'No cumplió' AS etiqueta, 1 AS orden
     UNION ALL SELECT 'Ausencias',  'casilla', 'Falta',      2
-    UNION ALL SELECT 'Retardos',   'casilla', 'Retardo',    3
+    UNION ALL SELECT 'Tareas',     'texto',   NULL,         3
     UNION ALL SELECT 'Uniformes',  'casilla', 'Incompleto', 4
     UNION ALL SELECT 'Conducta',   'texto',   NULL,         5
     UNION ALL SELECT 'Desempeño',  'texto',   NULL,         6

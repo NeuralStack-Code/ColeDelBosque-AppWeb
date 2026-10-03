@@ -158,9 +158,13 @@ dialog.rep-modal::backdrop { background: rgba(26,23,48,.5); backdrop-filter: blu
 .rep-campos input:focus, .rep-campos select:focus { outline: none; border-color: var(--azul-marca); }
 .rep-ayuda { color: var(--texto-suave); font-size: .88rem; margin: 14px 0 10px; }
 .rep-tabla-alumnos { max-height: 46vh; overflow: auto; border-radius: var(--radio-sm); border: 1px solid var(--borde); }
-.rep-tabla-alumnos .tabla-calif { box-shadow: none; border-radius: 0; }
+.rep-tabla-alumnos .tabla-calif { box-shadow: none; border-radius: 0; overflow: visible; /* si no, el encabezado fijo no se pega */ }
 .rep-tabla-alumnos thead th { position: sticky; top: 0; z-index: 1; background: var(--azul-claro); white-space: nowrap; }
 .rep-tabla-alumnos td.centro { text-align: center; }
+.rep-tabla-alumnos th, .rep-tabla-alumnos td { padding-left: 8px; padding-right: 8px; }
+.rep-tabla-alumnos thead th { white-space: normal; }   /* encabezados largos en dos líneas: caben más columnas */
+.rep-tabla-alumnos td.alumno { white-space: normal; min-width: 150px; }
+.rep-tabla-alumnos input[type="text"] { min-width: 130px; }
 .rep-tabla-alumnos input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--azul-marca); cursor: pointer; }
 .rep-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 18px; }
 .rep-acciones .btn { padding: .6em 1.3em; font-size: .95rem; }

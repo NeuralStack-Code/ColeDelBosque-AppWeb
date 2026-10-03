@@ -304,8 +304,14 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             const d = await getJSON(`${API}?action=vista_previa&cuenta_id=${a.id_cuenta}&inicio=${sem.inicio}`);
             if (!d.success) { window.notify('error', d.message); return; }
             document.getElementById('previaAsunto').textContent = d.asunto;
-            document.getElementById('previaFrame').srcdoc = d.html;
             dlgPrevia.showModal();
+            // iframe nuevo en cada apertura: reasignar srcdoc al mismo iframe lo deja en blanco
+            const frame = document.createElement('iframe');
+            frame.id = 'previaFrame';
+            frame.title = 'Vista previa del correo';
+            frame.setAttribute('sandbox', '');
+            frame.srcdoc = d.html;
+            document.getElementById('previaFrame').replaceWith(frame);
         }
 
         async function enviarUno(a) {

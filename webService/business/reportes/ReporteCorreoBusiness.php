@@ -57,7 +57,9 @@ class ReporteCorreoBusiness
                     . '<td style="' . $td . '">' . $this->e($c['tema']) . '</td>';
                 foreach ($columnas as $col) {
                     $txt = $this->celda($col, $c['marcas'][$col->id_columna] ?? null);
-                    $cuerpo .= '<td style="' . $td . ($txt !== '' ? 'font-weight:bold;color:#b91c1c;' : '') . '">' . $txt . '</td>';
+                    // Rojo solo para casillas (falta, retardo…); las notas pueden ser positivas
+                    $resalte = $txt === '' ? '' : ($col->tipo === 'casilla' ? 'font-weight:bold;color:#b91c1c;' : 'font-weight:bold;');
+                    $cuerpo .= '<td style="' . $td . $resalte . '">' . $txt . '</td>';
                 }
                 $cuerpo .= '</tr>';
             }
