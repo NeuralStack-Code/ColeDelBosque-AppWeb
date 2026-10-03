@@ -62,6 +62,10 @@ $img = $base . '/webService/wwwroot/img';
                     <div class="campo"><label>Matrícula</label><input type="text" id="matricula" placeholder="AAA######" required></div>
                     <div class="campo"><label>Grupo</label><select id="grado" required></select></div>
                 </div>
+                <div class="fila-2">
+                    <div class="campo"><label>Correo del tutor</label><input type="email" id="correo_tutor" maxlength="100" placeholder="Recibe el reporte semanal"></div>
+                    <div class="campo"><label>Segundo correo (opcional)</label><input type="email" id="correo_tutor2" maxlength="100"></div>
+                </div>
                 <div class="modal-acciones">
                     <button type="button" class="btn btn-fantasma" onclick="modal.close()">Cancelar</button>
                     <button type="submit" class="btn btn-primario">Guardar</button>
@@ -150,6 +154,8 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('materno').value = a.materno;
             document.getElementById('matricula').value = a.matricula ?? '';
             document.getElementById('grado').value = a.grupo_id ?? '';
+            document.getElementById('correo_tutor').value = a.correo_tutor ?? '';
+            document.getElementById('correo_tutor2').value = a.correo_tutor2 ?? '';
             modal.showModal();
         }
 
@@ -162,6 +168,8 @@ $img = $base . '/webService/wwwroot/img';
             fd.append('materno', materno.value);
             fd.append('matricula', matricula.value);
             fd.append('grado', grado.value);
+            fd.append('correo_tutor', correo_tutor.value);
+            fd.append('correo_tutor2', correo_tutor2.value);
             let accion = 'alumno_crear';
             if (id) { accion = 'alumno_editar'; fd.append('id_cuenta', id); }
             const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();

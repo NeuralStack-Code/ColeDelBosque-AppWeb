@@ -1,7 +1,9 @@
 <?php
+require_once dirname(__DIR__, 3) . '/apiService/core/crypto.php';
+
 /**
- * Vista de solo lectura del padre/alumno: calificaciones (por materia del grupo,
- * ciclo activo) y colegiaturas (con recargo/descuento/total/saldo). Aquí vive el SQL.
+ * Portal del padre/alumno: calificaciones (por materia del grupo, ciclo activo),
+ * colegiaturas (con recargo/descuento/total/saldo) y sus correos de tutor. Aquí vive el SQL.
  */
 class PadreBusiness
 {
@@ -24,11 +26,23 @@ class PadreBusiness
         return round($monto * $pct / 100 * $meses, 2);
     }
 
+    /** Correos de tutor (ENCRIPTADOS; '' → NULL) de la cuenta del alumno logueado. */
+    public function guardarCorreosTutor(int $usuarioId, string $correo1, string $correo2): bool
+    {
+        $c1 = $correo1 === '' ? null : encrypt($correo1);
+        $c2 = $correo2 === '' ? null : encrypt($correo2);
+        $s = mysqli_prepare($this->db, 'UPDATE cuenta SET correo_tutor = ?, correo_tutor2 = ? WHERE usuario_id = ? AND permiso_id = 3');
+        mysqli_stmt_bind_param($s, 'ssi', $c1, $c2, $usuarioId);
+        $ok = mysqli_stmt_execute($s);
+        mysqli_stmt_close($s);
+        return $ok;
+    }
+
     /** Resumen del alumno; null si no tiene cuenta. */
     public function resumen(int $usuarioId): ?array
     {
         $c = mysqli_prepare($this->db,
-            'SELECT id_cuenta, grupo_id FROM cuenta WHERE usuario_id = ? AND permiso_id = 3 LIMIT 1');
+            'SELECT id_cuenta, grupo_id, correo_tutor, correo_tutor2 FROM cuenta WHERE usuario_id = ? AND permiso_id = 3 LIMIT 1');
         mysqli_stmt_bind_param($c, 'i', $usuarioId);
         mysqli_stmt_execute($c);
         $cuenta = mysqli_fetch_assoc(mysqli_stmt_get_result($c));
@@ -99,6 +113,12 @@ class PadreBusiness
         }
         mysqli_stmt_close($p);
 
-        return ['grado' => $grado, 'calificaciones' => $calif, 'pagos' => $pagos];
+        return [
+            'grado'          => $grado,
+            'calificaciones' => $calif,
+            'pagos'          => $pagos,
+            'correo_tutor'   => empty($cuenta['correo_tutor'])  ? '' : (string) decrypt($cuenta['correo_tutor']),
+            'correo_tutor2'  => empty($cuenta['correo_tutor2']) ? '' : (string) decrypt($cuenta['correo_tutor2']),
+        ];
     }
 }

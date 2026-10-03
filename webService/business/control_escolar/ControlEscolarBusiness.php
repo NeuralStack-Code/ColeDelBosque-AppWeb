@@ -50,6 +50,30 @@ class ControlEscolarBusiness
         return true;
     }
 
+    /** id de la cuenta por matrícula (0 si no existe). */
+    public function idCuentaPorMatricula(string $matricula): int
+    {
+        $enc = encrypt($matricula);
+        $q = mysqli_prepare($this->db, 'SELECT id_cuenta FROM cuenta WHERE matricula = ? LIMIT 1');
+        mysqli_stmt_bind_param($q, 's', $enc);
+        mysqli_stmt_execute($q);
+        $row = mysqli_fetch_row(mysqli_stmt_get_result($q));
+        mysqli_stmt_close($q);
+        return (int) ($row[0] ?? 0);
+    }
+
+    /** Correos de los tutores del alumno (ENCRIPTADOS; '' → NULL). */
+    public function guardarCorreosTutor(int $idCuenta, string $correo1, string $correo2): bool
+    {
+        $c1 = $correo1 === '' ? null : encrypt($correo1);
+        $c2 = $correo2 === '' ? null : encrypt($correo2);
+        $s = mysqli_prepare($this->db, 'UPDATE cuenta SET correo_tutor = ?, correo_tutor2 = ? WHERE id_cuenta = ?');
+        mysqli_stmt_bind_param($s, 'ssi', $c1, $c2, $idCuenta);
+        $ok = mysqli_stmt_execute($s);
+        mysqli_stmt_close($s);
+        return $ok;
+    }
+
     public function obtenerUsuarioId(int $idCuenta): ?int
     {
         $q = mysqli_prepare($this->db, 'SELECT usuario_id FROM cuenta WHERE id_cuenta = ? LIMIT 1');
@@ -110,10 +134,10 @@ class ControlEscolarBusiness
         }
     }
 
-    /** Cuentas por permiso, con matrícula desencriptada. */
+    /** Cuentas por permiso, con matrícula y correos de tutor desencriptados. */
     public function listarPersonas(int $permiso): array
     {
-        $sql = 'SELECT c.id_cuenta, c.matricula, c.grupo_id, g.grado,
+        $sql = 'SELECT c.id_cuenta, c.matricula, c.grupo_id, g.grado, c.correo_tutor, c.correo_tutor2,
                        u.id_usuario, u.nombre, u.paterno, u.materno
                 FROM cuenta c
                 JOIN usuario u ON u.id_usuario = c.usuario_id
@@ -127,6 +151,9 @@ class ControlEscolarBusiness
         $items = [];
         while ($row = mysqli_fetch_assoc($res)) {
             $row['matricula'] = decrypt($row['matricula']);
+            foreach (['correo_tutor', 'correo_tutor2'] as $campo) {
+                $row[$campo] = empty($row[$campo]) ? '' : (string) decrypt($row[$campo]);
+            }
             $items[] = $row;
         }
         mysqli_stmt_close($stmt);

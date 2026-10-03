@@ -45,6 +45,11 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             <h3>Reportes y calificaciones</h3>
             <p>Registra calificaciones y reportes de tus alumnos.</p>
         </a>
+        <a class="tile" href="<?= $base ?>/maestro/reportes">
+            <span class="tile-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+            <h3>Reporte semanal</h3>
+            <p>Captura cada clase y envía el reporte a los papás.</p>
+        </a>
     </section>
 
     <script>

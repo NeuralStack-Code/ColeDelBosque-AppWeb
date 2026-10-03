@@ -30,6 +30,15 @@ class ControlEscolarController
         return (bool) preg_match('/^[A-Z]{3}[0-9]{6}$/', $m);
     }
 
+    /** Correo de tutor opcional: '' o un correo válido (a él llega el reporte semanal). */
+    private function correoTutor(string $campo): string
+    {
+        $c = trim($_POST[$campo] ?? '');
+        if ($c === '') return '';
+        if (strlen($c) > 100 || !filter_var($c, FILTER_VALIDATE_EMAIL)) response(400, false, 'Revisa el correo del tutor.');
+        return strtolower($c);
+    }
+
     private function crearPersona(int $permiso): void
     {
         $nombre  = trim($_POST['nombre']  ?? '');
@@ -42,15 +51,20 @@ class ControlEscolarController
         $this->validarNombres($nombre, $paterno, $materno);
         if (!$this->matriculaValida($mat)) response(400, false, 'La matrícula debe tener 3 mayúsculas y 6 números (AAA######).');
         if ($this->ce->matriculaExiste($mat)) response(409, false, 'La matrícula ya existe.');
+        $correo1 = $permiso === 3 ? $this->correoTutor('correo_tutor')  : '';
+        $correo2 = $permiso === 3 ? $this->correoTutor('correo_tutor2') : '';
 
         if (!$this->ce->crearPersona($nombre, $paterno, $materno, $grupo, $mat, $permiso)) {
             response(500, false, 'No se pudo crear la cuenta.');
+        }
+        if ($correo1 !== '' || $correo2 !== '') {
+            $this->ce->guardarCorreosTutor($this->ce->idCuentaPorMatricula($mat), $correo1, $correo2);
         }
         $etiqueta = $permiso === 2 ? 'maestro' : 'alumno';
         response(201, true, "¡Se ha registrado un nuevo $etiqueta!");
     }
 
-    private function editarPersona(): void
+    private function editarPersona(int $permiso): void
     {
         $id      = (int) ($_POST['id_cuenta'] ?? 0);
         $nombre  = trim($_POST['nombre']  ?? '');
@@ -65,10 +79,13 @@ class ControlEscolarController
 
         $usuarioId = $this->ce->obtenerUsuarioId($id);
         if ($usuarioId === null) response(404, false, 'No se encontró la cuenta.');
+        $correo1 = $permiso === 3 ? $this->correoTutor('correo_tutor')  : '';
+        $correo2 = $permiso === 3 ? $this->correoTutor('correo_tutor2') : '';
 
         if (!$this->ce->editarPersona($id, $usuarioId, $nombre, $paterno, $materno, $grado, $mat)) {
             response(500, false, 'No se pudo actualizar la cuenta.');
         }
+        if ($permiso === 3) $this->ce->guardarCorreosTutor($id, $correo1, $correo2);
         response(200, true, 'Se ha actualizado la información.');
     }
 
@@ -89,13 +106,13 @@ class ControlEscolarController
     /* ---------------- Alumnos (permiso 3) ---------------- */
     public function alumnos_listar(): void  { response(200, true, 'Listado obtenido.', ['items' => $this->ce->listarPersonas(3)]); }
     public function alumno_crear(): void    { $this->crearPersona(3); }
-    public function alumno_editar(): void   { $this->editarPersona(); }
+    public function alumno_editar(): void   { $this->editarPersona(3); }
     public function alumno_eliminar(): void { $this->eliminarPersona(); }
 
     /* ---------------- Maestros (permiso 2) ---------------- */
     public function maestros_listar(): void  { response(200, true, 'Listado obtenido.', ['items' => $this->ce->listarPersonas(2)]); }
     public function maestro_crear(): void    { $this->crearPersona(2); }
-    public function maestro_editar(): void   { $this->editarPersona(); }
+    public function maestro_editar(): void   { $this->editarPersona(2); }
     public function maestro_eliminar(): void { $this->eliminarPersona(); }
 
     /* ---------------- Grupos ---------------- */

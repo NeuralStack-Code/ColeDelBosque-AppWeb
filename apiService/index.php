@@ -51,6 +51,8 @@ $controllers = [
     'perfiles'        => ['PerfilController',          'principal'],
     'colegiaturas'    => ['ColegiaturaController',     'principal'],
     'control-escolar' => ['ControlEscolarController',  'principal'],
+    'reportes'        => ['ReporteController',         'principal'],
+    'reporte-columnas'=> ['ReporteColumnaController',  'principal'],
 ];
 
 try {

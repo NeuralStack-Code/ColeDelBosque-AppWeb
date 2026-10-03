@@ -52,6 +52,16 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
             </div>
             <p class="tabla-vacia" id="vacioPagos" style="display:none;">No hay colegiaturas registradas.</p>
         </div>
+
+        <!-- Correos del tutor -->
+        <div class="panel-seccion">
+            <h2><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg> Correo para el reporte semanal</h2>
+            <form class="filtros" id="formCorreos">
+                <div class="f buscar"><label for="correo_tutor">Correo del tutor</label><input type="email" id="correo_tutor" maxlength="100" placeholder="nombre@correo.com"></div>
+                <div class="f buscar"><label for="correo_tutor2">Segundo correo (opcional)</label><input type="email" id="correo_tutor2" maxlength="100"></div>
+                <div class="f-btns"><button type="submit" class="btn btn-primario">Guardar</button></div>
+            </form>
+        </div>
     </section>
 
     <script>
@@ -70,6 +80,8 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
             if (!d.success) { window.notify('error', d.message); return; }
 
             document.getElementById('grado').textContent = d.grado || '—';
+            document.getElementById('correo_tutor').value = d.correo_tutor || '';
+            document.getElementById('correo_tutor2').value = d.correo_tutor2 || '';
 
             // Calificaciones
             const fc = document.getElementById('filasCalif');
@@ -111,6 +123,17 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
                 fp.appendChild(tr);
             });
         }
+
+        document.getElementById('formCorreos').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fd = new FormData();
+            fd.append('correo_tutor', document.getElementById('correo_tutor').value);
+            fd.append('correo_tutor2', document.getElementById('correo_tutor2').value);
+            try {
+                const r = await fetch(API + '?action=guardar_correos', { method: 'POST', body: fd });
+                window.notifyResponse(await r.json());
+            } catch { window.notify('error', 'No se pudieron guardar los correos.'); }
+        });
 
         cargar();
     </script>

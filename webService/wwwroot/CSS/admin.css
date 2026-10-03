@@ -130,6 +130,7 @@ body {
 .acceso:nth-child(5) .a-ico { background: var(--azul-marca); }
 .acceso:nth-child(6) .a-ico { background: var(--azul-osc); }
 .acceso:nth-child(7) .a-ico { background: #14b8a6; }
+.acceso:nth-child(8) .a-ico { background: #f97316; }
 
 @media (max-width: 780px) { .dash-charts { grid-template-columns: 1fr; } }
 

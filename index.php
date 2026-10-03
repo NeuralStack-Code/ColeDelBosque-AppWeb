@@ -41,6 +41,7 @@ $routes = [
     //Maestro (permiso_id = 2)
     'maestro'                 => __DIR__ . '/webService/views/maestro/home.php',
     'maestro/calificaciones'  => __DIR__ . '/webService/views/maestro/calificaciones.php',
+    'maestro/reportes'        => __DIR__ . '/webService/views/maestro/reportes.php',
 
     //Padre / alumno (permiso_id = 3)
     'padre'            => __DIR__ . '/webService/views/padre/home.php',
@@ -59,6 +60,7 @@ $routes = [
     'administrador/tipos-descuento' => __DIR__ . '/webService/views/admin/tipos_descuento.php',
     'administrador/materias'      => __DIR__ . '/webService/views/admin/materias.php',
     'administrador/ciclos'        => __DIR__ . '/webService/views/admin/ciclos.php',
+    'administrador/reporte-columnas' => __DIR__ . '/webService/views/admin/reporte_columnas.php',
 
     //Desarrollador (permiso_id = 4)
     'desarrollador'            => __DIR__ . '/webService/views/dev/home.php',
