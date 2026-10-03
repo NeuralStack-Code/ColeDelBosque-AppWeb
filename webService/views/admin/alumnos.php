@@ -4,6 +4,7 @@ require __DIR__ . '/../partials/guard.php';
 $base = BASE_URL;
 $title = 'Alumnos | Admin';
 $extraCss = ['admin.css'];
+$extraJs = ['matricula.js'];
 $img = $base . '/webService/wwwroot/img';
 ?>
 <!DOCTYPE html>
@@ -56,12 +57,13 @@ $img = $base . '/webService/wwwroot/img';
                 <div class="campo"><label>Nombre</label><input type="text" id="nombre" required></div>
                 <div class="fila-2">
                     <div class="campo"><label>Apellido paterno</label><input type="text" id="paterno" required></div>
-                    <div class="campo"><label>Apellido materno</label><input type="text" id="materno" required></div>
+                    <div class="campo"><label>Apellido materno (opcional)</label><input type="text" id="materno"></div>
                 </div>
                 <div class="fila-2">
-                    <div class="campo"><label>Matrícula</label><input type="text" id="matricula" placeholder="AAA######" required></div>
+                    <div class="campo"><label>Matrícula</label><input type="text" id="matricula" placeholder="AAA######" maxlength="9" required></div>
                     <div class="campo"><label>Grupo</label><select id="grado" required></select></div>
                 </div>
+                <small id="matAyuda" style="display:block;margin:-8px 0 16px;color:var(--texto-suave);font-size:.82rem;"></small>
                 <div class="fila-2">
                     <div class="campo"><label>Correo del tutor</label><input type="email" id="correo_tutor" maxlength="100" placeholder="Recibe el reporte semanal"></div>
                     <div class="campo"><label>Segundo correo (opcional)</label><input type="email" id="correo_tutor2" maxlength="100"></div>
@@ -114,7 +116,7 @@ $img = $base . '/webService/wwwroot/img';
             const esHuerfano = a => !validos.has(Number(a.grupo_id));
             const f = todos.filter(a => {
                 if (mat && !(a.matricula || '').toLowerCase().includes(mat)) return false;
-                if (nom && !`${a.nombre} ${a.paterno} ${a.materno}`.toLowerCase().includes(nom)) return false;
+                if (nom && !`${a.nombre} ${a.paterno} ${a.materno ?? ''}`.toLowerCase().includes(nom)) return false;
                 if (grp === '__sin__') { if (!esHuerfano(a)) return false; }
                 else if (grp && String(a.grupo_id) !== grp) return false;
                 return true;
@@ -128,7 +130,7 @@ $img = $base . '/webService/wwwroot/img';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${a.matricula ?? ''}</td>
-                    <td>${a.nombre} ${a.paterno} ${a.materno}</td>
+                    <td>${a.nombre} ${a.paterno} ${a.materno ?? ''}</td>
                     <td>${celdaGrupo}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -142,17 +144,25 @@ $img = $base . '/webService/wwwroot/img';
         ['fMat', 'fNom', 'fGrupo'].forEach(id =>
             document.getElementById(id).addEventListener('input', render));
 
+        // Matrícula automática en altas (matricula.js): iniciales + 6 dígitos al azar
+        const mat = window.matriculaAuto(nombre, paterno, matricula);
+
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nuevo alumno';
-            form.reset(); document.getElementById('id_cuenta').value = ''; modal.showModal();
+            form.reset(); document.getElementById('id_cuenta').value = '';
+            mat.activar();
+            document.getElementById('matAyuda').textContent = 'Se genera sola: inicial del nombre + 2 letras del apellido paterno + 6 dígitos al azar. Puedes ajustarla.';
+            modal.showModal();
         }
         function abrirEdicion(a) {
             document.getElementById('modalTitulo').textContent = 'Editar alumno';
             document.getElementById('id_cuenta').value = a.id_cuenta;
             document.getElementById('nombre').value = a.nombre;
             document.getElementById('paterno').value = a.paterno;
-            document.getElementById('materno').value = a.materno;
+            document.getElementById('materno').value = a.materno ?? '';
             document.getElementById('matricula').value = a.matricula ?? '';
+            mat.desactivar();   // al editar no se regenera: cambiarla le cambia el acceso a la familia
+            document.getElementById('matAyuda').textContent = 'Es la clave de acceso de la familia; si la cambias, avísales.';
             document.getElementById('grado').value = a.grupo_id ?? '';
             document.getElementById('correo_tutor').value = a.correo_tutor ?? '';
             document.getElementById('correo_tutor2').value = a.correo_tutor2 ?? '';

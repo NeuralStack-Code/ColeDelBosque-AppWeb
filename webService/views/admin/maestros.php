@@ -4,6 +4,7 @@ require __DIR__ . '/../partials/guard.php';
 $base = BASE_URL;
 $title = 'Maestros | Admin';
 $extraCss = ['admin.css'];
+$extraJs = ['matricula.js'];
 $img = $base . '/webService/wwwroot/img';
 ?>
 <!DOCTYPE html>
@@ -56,10 +57,10 @@ $img = $base . '/webService/wwwroot/img';
                 <div class="campo"><label>Nombre</label><input type="text" id="nombre" required></div>
                 <div class="fila-2">
                     <div class="campo"><label>Apellido paterno</label><input type="text" id="paterno" required></div>
-                    <div class="campo"><label>Apellido materno</label><input type="text" id="materno" required></div>
+                    <div class="campo"><label>Apellido materno (opcional)</label><input type="text" id="materno"></div>
                 </div>
                 <div class="fila-2">
-                    <div class="campo"><label>Matrícula</label><input type="text" id="matricula" placeholder="AAA######" required></div>
+                    <div class="campo"><label>Matrícula</label><input type="text" id="matricula" placeholder="AAA######" maxlength="9" required></div>
                     <div class="campo"><label>Grupo</label><select id="grado" required></select></div>
                 </div>
                 <div class="modal-acciones">
@@ -104,7 +105,7 @@ $img = $base . '/webService/wwwroot/img';
             const grp = document.getElementById('fGrupo').value;
             const f = todos.filter(m => {
                 if (mat && !(m.matricula || '').toLowerCase().includes(mat)) return false;
-                if (nom && !`${m.nombre} ${m.paterno} ${m.materno}`.toLowerCase().includes(nom)) return false;
+                if (nom && !`${m.nombre} ${m.paterno} ${m.materno ?? ''}`.toLowerCase().includes(nom)) return false;
                 if (grp && String(m.grupo_id) !== grp) return false;
                 return true;
             });
@@ -114,7 +115,7 @@ $img = $base . '/webService/wwwroot/img';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${m.matricula ?? ''}</td>
-                    <td>${m.nombre} ${m.paterno} ${m.materno}</td>
+                    <td>${m.nombre} ${m.paterno} ${m.materno ?? ''}</td>
                     <td>${m.grado ?? '—'}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -128,17 +129,23 @@ $img = $base . '/webService/wwwroot/img';
         ['fMat', 'fNom', 'fGrupo'].forEach(id =>
             document.getElementById(id).addEventListener('input', render));
 
+        // Matrícula automática en altas (matricula.js): iniciales + 6 dígitos al azar
+        const mat = window.matriculaAuto(nombre, paterno, matricula);
+
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nuevo maestro';
-            form.reset(); document.getElementById('id_cuenta').value = ''; modal.showModal();
+            form.reset(); document.getElementById('id_cuenta').value = '';
+            mat.activar();
+            modal.showModal();
         }
         function abrirEdicion(m) {
             document.getElementById('modalTitulo').textContent = 'Editar maestro';
             document.getElementById('id_cuenta').value = m.id_cuenta;
             document.getElementById('nombre').value = m.nombre;
             document.getElementById('paterno').value = m.paterno;
-            document.getElementById('materno').value = m.materno;
+            document.getElementById('materno').value = m.materno ?? '';
             document.getElementById('matricula').value = m.matricula ?? '';
+            mat.desactivar();   // al editar no se regenera: es su clave de acceso
             document.getElementById('grado').value = m.grupo_id ?? '';
             modal.showModal();
         }

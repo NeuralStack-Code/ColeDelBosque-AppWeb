@@ -18,10 +18,12 @@ class ControlEscolarController
 
     private function validarNombres(string $nombre, string $paterno, string $materno): void
     {
-        foreach (['nombre' => $nombre, 'apellido paterno' => $paterno, 'apellido materno' => $materno] as $campo => $val) {
+        foreach (['nombre' => $nombre, 'apellido paterno' => $paterno] as $campo => $val) {
             if ($val === '')      response(400, false, "El $campo no puede estar vacío.");
             if (is_numeric($val)) response(400, false, "Revisa el $campo.");
         }
+        // El apellido materno NUNCA es obligatorio (regla del colegio); solo se revisa si viene
+        if (is_numeric($materno)) response(400, false, 'Revisa el apellido materno.');
     }
 
     /** La matrícula debe ser 3 mayúsculas + 6 números (AAA######). */
@@ -50,7 +52,7 @@ class ControlEscolarController
         if ($grupo <= 0) response(400, false, 'Selecciona un grupo válido.');
         $this->validarNombres($nombre, $paterno, $materno);
         if (!$this->matriculaValida($mat)) response(400, false, 'La matrícula debe tener 3 mayúsculas y 6 números (AAA######).');
-        if ($this->ce->matriculaExiste($mat)) response(409, false, 'La matrícula ya existe.');
+        if ($this->ce->matriculaExiste($mat)) response(409, false, 'La matrícula ya existe. Cambia algún dígito e inténtalo de nuevo.');
         $correo1 = $permiso === 3 ? $this->correoTutor('correo_tutor')  : '';
         $correo2 = $permiso === 3 ? $this->correoTutor('correo_tutor2') : '';
 
