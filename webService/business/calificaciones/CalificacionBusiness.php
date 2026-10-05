@@ -20,20 +20,53 @@ class CalificacionBusiness
         return $res ? mysqli_fetch_assoc($res) : null;
     }
 
-    /** Grupo que imparte el maestro logueado. */
-    public function grupoDelMaestro(int $usuarioId): int
+    /** Materias de inglés: las que empiezan con "Ingl" (Inglés, INGLES, Inglés 1…). */
+    private const ES_INGLES = "m.nombre LIKE 'ingl%'";
+
+    /**
+     * Grupos donde captura el maestro: el suyo (todas las materias) y los de los niveles de
+     * inglés que imparte (ahí solo Inglés). @return array<int,array{id_grupo:int,grado:string,solo_ingles:bool}>
+     */
+    public function gruposDelMaestro(int $usuarioId, int $cicloId): array
     {
-        $stmt = mysqli_prepare($this->db, 'SELECT grupo_id FROM cuenta WHERE usuario_id = ? AND permiso_id = 2 LIMIT 1');
+        $stmt = mysqli_prepare($this->db, 'SELECT grupo_id, niveles_ingles FROM cuenta WHERE usuario_id = ? AND permiso_id = 2 LIMIT 1');
         mysqli_stmt_bind_param($stmt, 'i', $usuarioId);
         mysqli_stmt_execute($stmt);
-        $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+        $cuenta = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
         mysqli_stmt_close($stmt);
-        return (int) ($row['grupo_id'] ?? 0);
+        if (!$cuenta) return [];
+
+        $grupos = [];
+        $propio = (int) $cuenta['grupo_id'];
+        if ($propio > 0) {
+            $grupos[] = ['id_grupo' => $propio, 'grado' => $this->gradoDeGrupo($propio), 'solo_ingles' => false];
+        }
+
+        $niveles = array_values(array_intersect(['basico', 'medio', 'avanzado'], explode(',', (string) $cuenta['niveles_ingles'])));
+        if ($niveles) {
+            $in  = "'" . implode("','", $niveles) . "'";   // valores de una lista fija, no del usuario
+            $sql = "SELECT g.id_grupo, g.grado FROM grupo g
+                    WHERE g.ciclo_id = ? AND g.id_grupo <> ? AND g.nivel_ingles IN ($in)
+                      AND EXISTS (SELECT 1 FROM grupo_materia gm JOIN materia m ON m.id_materia = gm.id_materia
+                                  WHERE gm.id_grupo = g.id_grupo AND " . self::ES_INGLES . ")
+                    ORDER BY g.nivel, g.grado";
+            $q = mysqli_prepare($this->db, $sql);
+            mysqli_stmt_bind_param($q, 'ii', $cicloId, $propio);
+            mysqli_stmt_execute($q);
+            $res = mysqli_stmt_get_result($q);
+            while ($r = mysqli_fetch_assoc($res)) {
+                $grupos[] = ['id_grupo' => (int) $r['id_grupo'], 'grado' => $r['grado'], 'solo_ingles' => true];
+            }
+            mysqli_stmt_close($q);
+        }
+        return $grupos;
     }
 
-    public function materiaEnGrupo(int $materiaId, int $grupoId): bool
+    public function materiaEnGrupo(int $materiaId, int $grupoId, bool $soloIngles = false): bool
     {
-        $stmt = mysqli_prepare($this->db, 'SELECT 1 FROM grupo_materia WHERE id_materia = ? AND id_grupo = ? LIMIT 1');
+        $stmt = mysqli_prepare($this->db,
+            'SELECT 1 FROM grupo_materia gm JOIN materia m ON m.id_materia = gm.id_materia
+             WHERE gm.id_materia = ? AND gm.id_grupo = ?' . ($soloIngles ? ' AND ' . self::ES_INGLES : '') . ' LIMIT 1');
         mysqli_stmt_bind_param($stmt, 'ii', $materiaId, $grupoId);
         mysqli_stmt_execute($stmt);
         $ok = (bool) mysqli_fetch_row(mysqli_stmt_get_result($stmt));
@@ -41,13 +74,13 @@ class CalificacionBusiness
         return $ok;
     }
 
-    /** Materias que se imparten en el grupo. */
-    public function materiasDeGrupo(int $grupoId): array
+    /** Materias que el maestro puede capturar en el grupo (todas, o solo Inglés). */
+    public function materiasDeGrupo(int $grupoId, bool $soloIngles = false): array
     {
         $ms = mysqli_prepare($this->db,
             'SELECT m.id_materia, m.nombre FROM grupo_materia gm
              JOIN materia m ON m.id_materia = gm.id_materia
-             WHERE gm.id_grupo = ? ORDER BY m.nombre');
+             WHERE gm.id_grupo = ?' . ($soloIngles ? ' AND ' . self::ES_INGLES : '') . ' ORDER BY m.nombre');
         mysqli_stmt_bind_param($ms, 'i', $grupoId);
         mysqli_stmt_execute($ms);
         $res = mysqli_stmt_get_result($ms);

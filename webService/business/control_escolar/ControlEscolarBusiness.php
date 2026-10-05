@@ -161,7 +161,7 @@ class ControlEscolarBusiness
     /** Cuentas por permiso, con matrícula y correos de tutor desencriptados. */
     public function listarPersonas(int $permiso): array
     {
-        $sql = 'SELECT c.id_cuenta, c.matricula, c.grupo_id, g.grado, c.correo_tutor, c.correo_tutor2,
+        $sql = 'SELECT c.id_cuenta, c.matricula, c.grupo_id, g.grado, c.correo_tutor, c.correo_tutor2, c.niveles_ingles,
                        u.id_usuario, u.nombre, u.paterno, u.materno
                 FROM cuenta c
                 JOIN usuario u ON u.id_usuario = c.usuario_id
@@ -189,7 +189,7 @@ class ControlEscolarBusiness
     public function gruposListar(int $cicloFiltro): array
     {
         $where = ' WHERE g.id_grupo <> 0' . ($cicloFiltro > 0 ? ' AND g.ciclo_id = ' . $cicloFiltro : '');
-        $sql = 'SELECT g.id_grupo, g.grado, g.maestra_id, g.ciclo_id, g.nivel, ci.nombre AS ciclo_nombre,
+        $sql = 'SELECT g.id_grupo, g.grado, g.maestra_id, g.ciclo_id, g.nivel, g.nivel_ingles, ci.nombre AS ciclo_nombre,
                        (SELECT COUNT(*) FROM grupo_materia gm WHERE gm.id_grupo = g.id_grupo) AS num_materias,
                        (SELECT COUNT(*) FROM cuenta cu WHERE cu.grupo_id = g.id_grupo AND cu.permiso_id = 3) AS num_alumnos
                 FROM grupo g
@@ -204,7 +204,7 @@ class ControlEscolarBusiness
 
     public function grupoBasico(int $gid): ?array
     {
-        $gs = mysqli_prepare($this->db, 'SELECT id_grupo, grado, maestra_id, ciclo_id, nivel FROM grupo WHERE id_grupo = ? LIMIT 1');
+        $gs = mysqli_prepare($this->db, 'SELECT id_grupo, grado, maestra_id, ciclo_id, nivel, nivel_ingles FROM grupo WHERE id_grupo = ? LIMIT 1');
         mysqli_stmt_bind_param($gs, 'i', $gid);
         mysqli_stmt_execute($gs);
         $grupo = mysqli_fetch_assoc(mysqli_stmt_get_result($gs));
@@ -353,6 +353,33 @@ class ControlEscolarBusiness
     {
         $s = mysqli_prepare($this->db, 'UPDATE grupo SET nivel = ? WHERE id_grupo = ?');
         mysqli_stmt_bind_param($s, 'ii', $nivel, $grupoId);
+        mysqli_stmt_execute($s);
+        mysqli_stmt_close($s);
+    }
+
+    /** Nivel de inglés del grupo: basico | medio | avanzado | null (sin nivel). */
+    public function grupoSetNivelIngles(int $grupoId, ?string $nivel): void
+    {
+        $s = mysqli_prepare($this->db, 'UPDATE grupo SET nivel_ingles = ? WHERE id_grupo = ?');
+        mysqli_stmt_bind_param($s, 'si', $nivel, $grupoId);
+        mysqli_stmt_execute($s);
+        mysqli_stmt_close($s);
+    }
+
+    /** Niveles de inglés que imparte el maestro ('basico,medio' | null = no da inglés). */
+    public function guardarNivelesIngles(int $idCuenta, ?string $niveles): void
+    {
+        $s = mysqli_prepare($this->db, 'UPDATE cuenta SET niveles_ingles = ? WHERE id_cuenta = ? AND permiso_id = 2');
+        mysqli_stmt_bind_param($s, 'si', $niveles, $idCuenta);
+        mysqli_stmt_execute($s);
+        mysqli_stmt_close($s);
+    }
+
+    /** Deja al maestro sin grupo propio (comodín 0): solo da inglés. */
+    public function quitarGrupo(int $idCuenta): void
+    {
+        $s = mysqli_prepare($this->db, 'UPDATE cuenta SET grupo_id = 0 WHERE id_cuenta = ? AND permiso_id = 2');
+        mysqli_stmt_bind_param($s, 'i', $idCuenta);
         mysqli_stmt_execute($s);
         mysqli_stmt_close($s);
     }

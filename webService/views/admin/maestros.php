@@ -61,7 +61,16 @@ $img = $base . '/webService/wwwroot/img';
                 </div>
                 <div class="fila-2">
                     <div class="campo"><label>Matrícula</label><input type="text" id="matricula" placeholder="AAA######" maxlength="9" required></div>
-                    <div class="campo"><label>Grupo</label><select id="grado" required></select></div>
+                    <div class="campo"><label>Grupo</label><select id="grado"></select></div>
+                </div>
+                <div class="campo">
+                    <label>Niveles de inglés que imparte</label>
+                    <div class="lista-check" id="nivelesIngles">
+                        <label><input type="checkbox" value="basico"><span>Básico</span></label>
+                        <label><input type="checkbox" value="medio"><span>Medio</span></label>
+                        <label><input type="checkbox" value="avanzado"><span>Avanzado</span></label>
+                    </div>
+                    <small style="display:block;margin-top:6px;color:var(--texto-suave);font-size:.82rem;">Déjalo vacío si no da inglés. Con un nivel marcado captura Inglés en todos los grupos de ese nivel.</small>
                 </div>
                 <div class="modal-acciones">
                     <button type="button" class="btn btn-fantasma" onclick="modal.close()">Cancelar</button>
@@ -89,7 +98,7 @@ $img = $base . '/webService/wwwroot/img';
             const d = await (await fetch(API + '?action=grupos_listar')).json();
             grupos = d.items || [];
             const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
-            document.getElementById('grado').innerHTML = opts || '<option value="">Sin grupos</option>';
+            document.getElementById('grado').innerHTML = opts + '<option value="0">Sin grupo (solo inglés)</option>';
             document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' + opts;
         }
 
@@ -132,9 +141,17 @@ $img = $base . '/webService/wwwroot/img';
         // Matrícula automática en altas (matricula.js): iniciales + 6 dígitos al azar
         const mat = window.matriculaAuto(nombre, paterno, matricula);
 
+        // Niveles de inglés: 'basico,medio' ↔ casillas
+        function marcarNiveles(csv) {
+            const sel = String(csv ?? '').split(',');
+            document.querySelectorAll('#nivelesIngles input').forEach(c => c.checked = sel.includes(c.value));
+        }
+        const nivelesMarcados = () => [...document.querySelectorAll('#nivelesIngles input:checked')].map(c => c.value);
+
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nuevo maestro';
             form.reset(); document.getElementById('id_cuenta').value = '';
+            marcarNiveles('');
             mat.activar();
             modal.showModal();
         }
@@ -146,7 +163,8 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('materno').value = m.materno ?? '';
             document.getElementById('matricula').value = m.matricula ?? '';
             mat.desactivar();   // al editar no se regenera: es su clave de acceso
-            document.getElementById('grado').value = m.grupo_id ?? '';
+            document.getElementById('grado').value = Number(m.grupo_id) > 0 ? m.grupo_id : '0';
+            marcarNiveles(m.niveles_ingles);
             modal.showModal();
         }
 
@@ -159,6 +177,11 @@ $img = $base . '/webService/wwwroot/img';
             fd.append('materno', materno.value);
             fd.append('matricula', matricula.value);
             fd.append('grado', grado.value);
+            fd.append('niveles_ingles', JSON.stringify(nivelesMarcados()));
+            if (grado.value === '0') fd.append('sin_grupo', '1');
+            if (grado.value === '0' && !nivelesMarcados().length) {
+                window.notify('error', 'Selecciona un grupo o marca los niveles de inglés que imparte.'); return;
+            }
             let accion = 'maestro_crear';
             if (id) { accion = 'maestro_editar'; fd.append('id_cuenta', id); }
             const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();

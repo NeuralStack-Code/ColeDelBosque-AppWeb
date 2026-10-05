@@ -137,6 +137,17 @@ class ReporteBusiness
         }
     }
 
+    /** Materia de una clase del grupo (0 si no existe). */
+    public function materiaDeClase(int $claseId, int $grupoId): int
+    {
+        $stmt = mysqli_prepare($this->db, 'SELECT materia_id FROM reporte_clase WHERE id_clase = ? AND grupo_id = ? LIMIT 1');
+        mysqli_stmt_bind_param($stmt, 'ii', $claseId, $grupoId);
+        mysqli_stmt_execute($stmt);
+        $row = mysqli_fetch_row(mysqli_stmt_get_result($stmt));
+        mysqli_stmt_close($stmt);
+        return (int) ($row[0] ?? 0);
+    }
+
     /** @return int filas afectadas (0 = no existía o no es del grupo). Las marcas caen por FK. */
     public function eliminarClase(int $claseId, int $grupoId): int
     {

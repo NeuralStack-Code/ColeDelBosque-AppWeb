@@ -56,6 +56,16 @@ $img = $base . '/webService/wwwroot/img';
                     <div class="campo"><label>Nivel (orden)</label><input type="number" id="nivel" min="1" placeholder="Ej. 1 = 1°"></div>
                 </div>
 
+                <div class="campo">
+                    <label>Nivel de inglés</label>
+                    <select id="nivel_ingles">
+                        <option value="">Sin nivel</option>
+                        <option value="basico">Básico</option>
+                        <option value="medio">Medio</option>
+                        <option value="avanzado">Avanzado</option>
+                    </select>
+                </div>
+
                 <div class="campo" id="campoMaestra" style="display:none;">
                     <label>Maestra asignada</label>
                     <select id="maestra"><option value="">Sin asignar</option></select>
@@ -63,7 +73,7 @@ $img = $base . '/webService/wwwroot/img';
 
                 <div class="campo">
                     <label>Materias del grupo</label>
-                    <div class="chips" id="materiasCheck" style="flex-direction:column;align-items:stretch;gap:6px;max-height:200px;overflow:auto;"></div>
+                    <div class="lista-check" id="materiasCheck"></div>
                     <small id="sinCatalogo" style="color:var(--texto-suave);display:none;">Aún no hay materias en el catálogo.</small>
                     <div style="display:flex;gap:8px;margin-top:10px;">
                         <input type="text" id="materiaInput" placeholder="Agregar materia nueva…">
@@ -142,7 +152,7 @@ $img = $base . '/webService/wwwroot/img';
             const sel = new Set(seleccionados.map(Number));
             document.getElementById('sinCatalogo').style.display = catalogoMaterias.length ? 'none' : 'block';
             cont.innerHTML = catalogoMaterias.map(m => `
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <label>
                     <input type="checkbox" value="${m.id_materia}" ${sel.has(Number(m.id_materia)) ? 'checked' : ''}>
                     <span>${m.nombre}</span>
                 </label>`).join('');
@@ -195,6 +205,7 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('grado').value = d.grupo.grado;
             document.getElementById('ciclo_id').value = d.grupo.ciclo_id ?? '';
             document.getElementById('nivel').value = d.grupo.nivel ?? '';
+            document.getElementById('nivel_ingles').value = d.grupo.nivel_ingles ?? '';
             catalogoMaterias = (d.catalogo || catalogoMaterias);
             materiasNuevas = [];
             pintarChecklist((d.materias || []).map(m => m.id_materia));
@@ -214,6 +225,7 @@ $img = $base . '/webService/wwwroot/img';
             const fd = new FormData();
             fd.append('ciclo_id', document.getElementById('ciclo_id').value);
             fd.append('nivel', document.getElementById('nivel').value);
+            fd.append('nivel_ingles', document.getElementById('nivel_ingles').value);
             fd.append('materia_ids', JSON.stringify(materiasMarcadas()));
             fd.append('materias_nuevas', JSON.stringify(materiasNuevas));
             if (id) {

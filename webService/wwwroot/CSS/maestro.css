@@ -119,6 +119,8 @@
     font-family: var(--fuente-texto); color: var(--texto); cursor: pointer; transition: border-color .15s ease;
 }
 .rep-clase:hover { border-color: var(--azul-marca); }
+.rep-clase:disabled { background: var(--fondo-alt); cursor: default; opacity: .75; }
+.rep-clase:disabled:hover { border-color: transparent; }
 .rep-clase strong { font-size: .88rem; color: var(--azul-osc); overflow-wrap: anywhere; }
 .rep-clase span { font-size: .82rem; color: var(--texto-suave); overflow-wrap: anywhere; }
 .rep-clase em { font-style: normal; font-size: .75rem; font-weight: 700; color: #b45309; }

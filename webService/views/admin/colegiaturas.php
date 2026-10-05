@@ -38,277 +38,319 @@ $img = $base . '/webService/wwwroot/img';
 
         <div class="filtros">
             <div class="f"><label>Grupo</label><select id="fGrupo"><option value="">Todos</option></select></div>
-            <div class="f"><label>Tipo</label><select id="fTipo"><option value="">Todos</option><option value="inscripcion">Inscripción</option><option value="colegiatura">Colegiatura</option></select></div>
-            <div class="f"><label>Mes</label><select id="fMes"><option value="">Todos</option></select></div>
-            <div class="f"><label>Estatus</label><select id="fEstatus"><option value="">Todos</option><option value="pendiente">Pendientes</option><option value="pagado">Pagadas</option></select></div>
+            <div class="f"><label>Estatus</label>
+                <select id="fEstatus">
+                    <option value="">Todos</option>
+                    <option value="adeudo">Con adeudo vencido</option>
+                    <option value="corriente">Al corriente</option>
+                    <option value="pagado">Todo pagado</option>
+                </select>
+            </div>
             <div class="f buscar"><label>Buscar alumno</label><input type="text" id="fBuscar" placeholder="Nombre…"></div>
         </div>
 
+        <!-- Un renglón por alumno; el detalle mes por mes se administra en su ventana -->
         <div class="tabla-scroll">
             <table class="tabla">
-                <thead><tr><th>Alumno</th><th>Grupo</th><th>Concepto</th><th>Vence</th><th>Monto</th><th>Recargo</th><th>Descuento</th><th>Total</th><th>Estatus</th><th></th></tr></thead>
+                <thead><tr><th>Alumno</th><th>Grupo</th><th>Pagos cubiertos</th><th>Total</th><th>Abonado</th><th>Saldo</th><th>Vencido</th><th>Estatus</th><th></th></tr></thead>
                 <tbody id="filas"></tbody>
             </table>
         </div>
         <p class="tabla-vacia" id="vacio" style="display:none;">No hay colegiaturas. Aplica un esquema de pago para empezar.</p>
     </section>
 
-    <!-- Estado de cuenta del alumno: todos sus pagos del ciclo, mes por mes -->
-    <dialog class="modal ancho" id="mCuenta">
+    <!-- Cuenta del alumno: se marcan los meses y se les aplica descuento, recargo o pago de una vez -->
+    <dialog class="modal ancho" id="mAlumno">
         <div class="modal-in">
-            <h3 id="cuentaTitulo">Estado de cuenta</h3>
-            <p id="cuentaSub" style="color:var(--texto-suave);margin-bottom:14px;"></p>
+            <h3 id="alTitulo">Cuenta del alumno</h3>
+            <p id="alSub" style="color:var(--texto-suave);margin-bottom:14px;"></p>
+
             <div class="desglose-scroll">
                 <table class="tabla-desglose">
-                    <thead><tr><th>Concepto</th><th>Vence</th><th class="num">Monto</th><th class="num">Descuento</th><th class="num">Recargo</th><th class="num">Total</th><th class="num">Abonado</th><th class="num">Saldo</th><th>Estatus</th></tr></thead>
-                    <tbody id="cuentaFilas"></tbody>
-                    <tfoot id="cuentaPie"></tfoot>
+                    <thead><tr>
+                        <th><input type="checkbox" id="alTodos" title="Marcar todos los pendientes" aria-label="Marcar todos los pendientes"></th>
+                        <th>Concepto</th><th>Vence</th><th class="num">Monto</th><th class="num">Descuento</th><th class="num">Recargo</th>
+                        <th class="num">Total</th><th class="num">Abonado</th><th class="num">Saldo</th><th>Estatus</th><th></th>
+                    </tr></thead>
+                    <tbody id="alFilas"></tbody>
+                    <tfoot id="alPie"></tfoot>
                 </table>
             </div>
-            <div class="modal-acciones">
-                <button type="button" class="btn btn-fantasma" onclick="mCuenta.close()">Cerrar</button>
-            </div>
-        </div>
-    </dialog>
 
-    <!-- Modal registrar pago / abono -->
-    <dialog class="modal" id="mPago">
-        <div class="modal-in">
-            <h3>Registrar pago</h3>
-            <p class="sub" id="pagoInfo" style="color:var(--texto-suave);margin-bottom:12px;"></p>
-            <div class="fila-2">
-                <div class="campo"><label>Monto a pagar ($)</label><input type="number" id="pMonto" min="0" step="0.01"></div>
-                <div class="campo"><label>Método de pago</label>
-                    <select id="pTipo"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Cheque</option><option>Otro</option></select>
+            <p id="alSeleccion" style="font-weight:700;margin-bottom:10px;"></p>
+            <div class="cuenta-acciones">
+                <div class="cuenta-bloque">
+                    <label for="aDesc">Descuento</label>
+                    <select id="aDesc"></select>
+                    <button type="button" class="btn btn-fantasma" id="btnDesc">Aplicar descuento</button>
+                </div>
+                <div class="cuenta-bloque">
+                    <label for="aRec">Recargo por mes vencido ($)</label>
+                    <input type="number" id="aRec" min="0" step="0.01" placeholder="0 = sin recargo">
+                    <button type="button" class="btn btn-fantasma" id="btnRec">Aplicar recargo</button>
+                </div>
+                <div class="cuenta-bloque">
+                    <label for="aMonto">Pago ($)</label>
+                    <div class="fila-2">
+                        <input type="number" id="aMonto" min="0" step="0.01" aria-label="Monto a pagar">
+                        <select id="aMetodo" aria-label="Método de pago"><option>Efectivo</option><option>Transferencia</option><option>Tarjeta</option><option>Cheque</option><option>Otro</option></select>
+                    </div>
+                    <button type="button" class="btn btn-primario" id="btnPago">Registrar pago</button>
                 </div>
             </div>
-            <p style="color:var(--texto-suave);font-size:.85rem;margin:2px 0 0;">Deja el saldo completo para saldar, o captura menos para registrar un <strong>abono</strong>.</p>
-            <div class="modal-acciones">
-                <button type="button" class="btn btn-fantasma" onclick="mPago.close()">Cancelar</button>
-                <button type="button" class="btn btn-primario" onclick="confirmarPago()">Registrar y generar recibo</button>
-            </div>
-        </div>
-    </dialog>
+            <p id="alAyuda" style="color:var(--texto-suave);font-size:.85rem;margin-top:10px;"></p>
 
-    <!-- Modal descuento -->
-    <dialog class="modal" id="mDesc">
-        <div class="modal-in">
-            <h3>Aplicar descuento</h3>
-            <p class="sub" id="descInfo" style="color:var(--texto-suave);margin-bottom:14px;"></p>
-            <div class="campo"><label>Tipo de descuento</label>
-                <select id="dTipo"><option value="0">Sin descuento</option></select>
-            </div>
-            <p id="descPreview" style="margin:4px 0 0;font-weight:700;color:var(--verde);"></p>
             <div class="modal-acciones">
-                <button type="button" class="btn btn-fantasma" onclick="mDesc.close()">Cancelar</button>
-                <button type="button" class="btn btn-primario" onclick="confirmarDescuento()">Aplicar</button>
+                <button type="button" class="btn btn-fantasma" onclick="mAlumno.close()">Cerrar</button>
             </div>
         </div>
     </dialog>
 
     <script>
         const API = window.BASE_URL + '/api/colegiaturas';
-        const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const money = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
+        const o = v => Number(v) ? money(v) : '—';   // monto opcional: 0 → raya
+        const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
         const filas = document.getElementById('filas'), vacio = document.getElementById('vacio');
-        let todos = [], grupos = [], alumnos = [], descuentos = [];
-        let estatusMap = {};
-        let pagoId = null, descRow = null;
+        const mAlumno = document.getElementById('mAlumno');
+        const ESTATUS_AL = { adeudo: ['pendiente', 'Con adeudo'], corriente: ['parcial', 'Al corriente'], pagado: ['pagado', 'Todo pagado'] };
+        let todos = [], descuentos = [], estatusMap = {};
+        let cuentaAbierta = null;   // cuenta_id del alumno en la ventana
 
         function cerrarSesion() {
             fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
                 .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
         }
 
+        /* ---------- Datos ---------- */
+
+        const estDe = c => (c.estatus || 'pendiente').toLowerCase();
+        const saldoDe = c => estDe(c) === 'pagado' ? 0 : Number(c.saldo);
+        const abonadoDe = c => estDe(c) === 'pagado' ? Number(c.total) : Number(c.abonado);
+        const hoy = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
+        const conceptoDe = c => c.tipo === 'inscripcion' ? 'Inscripción'
+            : (c.mes ?? '') + (c.fecha_vencimiento ? ' ' + c.fecha_vencimiento.slice(0, 4) : '');
+
+        // Pagos de un alumno: inscripción primero y luego por vencimiento
+        function pagosDe(cuentaId) {
+            return todos.filter(c => String(c.cuenta_id) === String(cuentaId))
+                .sort((a, b) => (a.tipo === 'inscripcion' ? 0 : 1) - (b.tipo === 'inscripcion' ? 0 : 1)
+                    || String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento)));
+        }
+
+        // Un resumen por alumno a partir de sus pagos
+        function resumenes() {
+            const mapa = new Map();
+            todos.forEach(c => {
+                let r = mapa.get(c.cuenta_id);
+                if (!r) mapa.set(c.cuenta_id, r = { cuenta_id: c.cuenta_id, alumno: c.alumno, grado: c.grado, grupo_id: c.grupo_id,
+                    pagos: 0, cubiertos: 0, total: 0, abonado: 0, saldo: 0, vencido: 0 });
+                r.pagos++;
+                if (estDe(c) === 'pagado') r.cubiertos++;
+                r.total += Number(c.total); r.abonado += abonadoDe(c); r.saldo += saldoDe(c);
+                if (saldoDe(c) > 0 && c.fecha_vencimiento && c.fecha_vencimiento < hoy) r.vencido += saldoDe(c);
+            });
+            return [...mapa.values()].map(r => ({ ...r, estatus: r.saldo <= 0.005 ? 'pagado' : (r.vencido > 0 ? 'adeudo' : 'corriente') }));
+        }
+
         async function cargarCatalogos() {
             const d = await (await fetch(API + '?action=catalogos')).json();
-            grupos = d.grupos || [];
-            alumnos = d.alumnos || [];
             descuentos = d.descuentos || [];
             estatusMap = {};
             (d.estatus || []).forEach(s => estatusMap[s.clave] = s.nombre);
-            const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
-            document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' + opts;
+            document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>'
+                + (d.grupos || []).map(g => `<option value="${g.id_grupo}">${esc(g.grado)}</option>`).join('');
             document.getElementById('cicloRotulo').textContent = d.ciclo ? '· ' + d.ciclo.nombre : '· sin ciclo activo';
         }
 
         async function cargar() {
             const d = await (await fetch(API + '?action=listar')).json();
             todos = d.items || [];
-            actualizarMeses();
             render();
+            if (cuentaAbierta !== null && mAlumno.open) pintarCuenta();
         }
 
-        // Cascada: los meses disponibles dependen del grupo seleccionado
-        function actualizarMeses() {
-            const grp = document.getElementById('fGrupo').value;
-            const base = grp ? todos.filter(c => String(c.grupo_id) === grp) : todos;
-            const meses = [...new Set(base.map(c => c.mes).filter(m => m && m !== 'Inscripción'))]
-                .sort((a, b) => MESES.indexOf(a) - MESES.indexOf(b));
-            const sel = document.getElementById('fMes');
-            const actual = sel.value;
-            sel.innerHTML = '<option value="">Todos</option>' + meses.map(m => `<option>${m}</option>`).join('');
-            sel.value = meses.includes(actual) ? actual : '';
-        }
+        /* ---------- Listado: un renglón por alumno ---------- */
 
         function render() {
             const q = document.getElementById('fBuscar').value.toLowerCase();
             const grp = document.getElementById('fGrupo').value;
-            const tipo = document.getElementById('fTipo').value;
-            const mes = document.getElementById('fMes').value;
             const est = document.getElementById('fEstatus').value;
-            const f = todos.filter(c => {
-                if (grp && String(c.grupo_id) !== grp) return false;
-                if (tipo && (c.tipo || 'colegiatura') !== tipo) return false;
-                if (mes && (c.mes || '') !== mes) return false;
-                if (est && (c.estatus || '').toLowerCase() !== est) return false;
-                if (q && !(c.alumno || '').toLowerCase().includes(q)) return false;
+            const f = resumenes().filter(r => {
+                if (grp && String(r.grupo_id) !== grp) return false;
+                if (est && r.estatus !== est) return false;
+                if (q && !(r.alumno || '').toLowerCase().includes(q)) return false;
                 return true;
             });
             filas.innerHTML = '';
             vacio.style.display = f.length ? 'none' : 'block';
-            f.forEach(c => {
-                const estClave = (c.estatus || 'pendiente').toLowerCase();
-                const estLabel = estatusMap[estClave] || c.estatus;
-                const pagado = estClave === 'pagado';
-                const esIns = c.tipo === 'inscripcion';
-                const concepto = esIns
-                    ? '<span class="badge-estatus parcial">Inscripción</span>'
-                    : (c.mes ?? '');
-                const reciboLink = c.recibo_id
-                    ? `<a class="icon-btn" title="Ver recibo" href="${window.BASE_URL}/recibo?id=${c.recibo_id}" target="_blank">🧾</a>` : '';
-                const acciones = pagado
-                    ? (c.recibo_id ? `<a class="badge-estatus pagado" href="${window.BASE_URL}/recibo?id=${c.recibo_id}" target="_blank" style="text-decoration:none">pagado 🧾</a>` : `<span class="badge-estatus pagado">pagado</span>`)
-                    : `<button class="icon-btn editar" title="Registrar pago o abono" data-a="pago"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></button>
-                       <button class="icon-btn editar" title="Descuento" data-a="desc"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 9h.01M15 15h.01M17 7 7 17"/><path d="M20.9 12a9 9 0 1 1-9-9"/></svg></button>${reciboLink}`;
-                const saldoLinea = (!pagado && Number(c.abonado) > 0)
-                    ? `<br><small style="color:var(--texto-suave)">Abonado ${money(c.abonado)} · Saldo <strong>${money(c.saldo)}</strong></small>` : '';
+            f.forEach(r => {
+                const [clase, rotulo] = ESTATUS_AL[r.estatus];
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><button type="button" class="enlace-alumno" title="Ver estado de cuenta">${c.alumno}</button></td>
-                    <td>${c.grado ?? '—'}</td>
-                    <td>${concepto}</td>
-                    <td>${c.fecha_vencimiento ?? '—'}</td>
-                    <td>${money(c.monto)}</td>
-                    <td style="color:${Number(c.recargo_calc) ? 'var(--rojo)' : 'inherit'}">${Number(c.recargo_calc) ? money(c.recargo_calc) : '—'}</td>
-                    <td style="color:${Number(c.descuento) ? 'var(--verde)' : 'inherit'}">${Number(c.descuento) ? '−' + money(c.descuento) : '—'}${c.concepto_descuento ? ' <small style="color:var(--texto-suave)">(' + c.concepto_descuento + ')</small>' : ''}</td>
-                    <td><strong>${money(c.total)}</strong>${saldoLinea}</td>
-                    <td><span class="badge-estatus ${estClave}">${estLabel}</span></td>
-                    <td><div class="acciones">${acciones}
-                        <button class="icon-btn borrar" title="Eliminar" data-a="del"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
-                    </div></td>`;
-                tr.querySelector('.enlace-alumno').addEventListener('click', () => abrirCuenta(c));
-                tr.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => {
-                    if (b.dataset.a === 'pago') abrirPago(c);
-                    else if (b.dataset.a === 'desc') abrirDesc(c);
-                    else eliminar(c);
-                }));
+                    <td><button type="button" class="enlace-alumno">${esc(r.alumno)}</button></td>
+                    <td>${esc(r.grado ?? '—')}</td>
+                    <td>${r.cubiertos} de ${r.pagos}</td>
+                    <td>${money(r.total)}</td>
+                    <td>${o(r.abonado)}</td>
+                    <td><strong>${money(r.saldo)}</strong></td>
+                    <td style="color:${r.vencido ? 'var(--rojo)' : 'inherit'}">${o(r.vencido)}</td>
+                    <td><span class="badge-estatus ${clase}" style="text-transform:none">${rotulo}</span></td>
+                    <td><button type="button" class="btn btn-fantasma administrar" style="padding:.4em 1em;font-size:.85rem;">Administrar</button></td>`;
+                tr.querySelector('.enlace-alumno').addEventListener('click', () => abrirCuenta(r.cuenta_id));
+                tr.querySelector('.administrar').addEventListener('click', () => abrirCuenta(r.cuenta_id));
                 filas.appendChild(tr);
             });
         }
-        document.getElementById('fGrupo').addEventListener('change', () => { actualizarMeses(); render(); });
-        ['fTipo', 'fMes', 'fEstatus', 'fBuscar'].forEach(id => document.getElementById(id).addEventListener('input', render));
+        ['fGrupo', 'fEstatus', 'fBuscar'].forEach(id => document.getElementById(id).addEventListener('input', render));
 
-        /* ---------- Estado de cuenta ---------- */
-        function abrirCuenta(c) {
-            const suyos = todos.filter(x => String(x.cuenta_id) === String(c.cuenta_id))
-                .sort((a, b) => (a.tipo === 'inscripcion' ? 0 : 1) - (b.tipo === 'inscripcion' ? 0 : 1)
-                    || String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento)));
+        /* ---------- Cuenta del alumno ---------- */
+
+        function abrirCuenta(cuentaId) {
+            cuentaAbierta = cuentaId;
+            document.getElementById('aRec').value = '';
+            document.getElementById('aDesc').innerHTML = '<option value="0">Quitar descuento</option>'
+                + descuentos.map(d => `<option value="${d.id_descuento}">${esc(d.nombre)} (${Number(d.porcentaje)}% · ${d.aplica_a === 'inscripcion' ? 'inscripción' : 'colegiatura'})</option>`).join('');
+            pintarCuenta(true);
+            mAlumno.showModal();
+        }
+
+        // marcarPendientes: al abrir, deja listos los meses ya vencidos (lo más común es cobrarlos)
+        function pintarCuenta(marcarVencidos = false) {
+            const suyos = pagosDe(cuentaAbierta);
+            if (!suyos.length) { mAlumno.close(); return; }
+            const marcados = new Set(seleccion().map(c => String(c.id_pago)));
             const t = { monto: 0, descuento: 0, recargo: 0, total: 0, abonado: 0, saldo: 0 };
-            const o = v => Number(v) ? money(v) : '—';
-            document.getElementById('cuentaFilas').innerHTML = suyos.map(x => {
-                const est = (x.estatus || 'pendiente').toLowerCase();
-                const saldo = est === 'pagado' ? 0 : Number(x.saldo);
-                const abonado = est === 'pagado' ? Number(x.total) : Number(x.abonado);
-                t.monto += Number(x.monto); t.descuento += Number(x.descuento); t.recargo += Number(x.recargo_calc);
-                t.total += Number(x.total); t.abonado += abonado; t.saldo += saldo;
-                const venc = x.fecha_vencimiento ? x.fecha_vencimiento.split('-').reverse().join('/') : '—';
-                return `<tr>
-                    <td>${x.tipo === 'inscripcion' ? 'Inscripción' : (x.mes ?? '') + (x.fecha_vencimiento ? ' ' + x.fecha_vencimiento.slice(0, 4) : '')}</td>
-                    <td>${venc}</td>
-                    <td class="num">${money(x.monto)}</td>
-                    <td class="num" style="color:${Number(x.descuento) ? 'var(--verde)' : 'inherit'}">${Number(x.descuento) ? '−' + money(x.descuento) : '—'}</td>
-                    <td class="num" style="color:${Number(x.recargo_calc) ? 'var(--rojo)' : 'inherit'}">${o(x.recargo_calc)}</td>
-                    <td class="num"><strong>${money(x.total)}</strong></td>
-                    <td class="num">${o(abonado)}</td>
-                    <td class="num">${o(saldo)}</td>
-                    <td><span class="badge-estatus ${est}">${estatusMap[est] || est}</span></td>
+
+            document.getElementById('alFilas').innerHTML = suyos.map(c => {
+                const est = estDe(c), pagado = est === 'pagado';
+                t.monto += Number(c.monto); t.descuento += Number(c.descuento); t.recargo += Number(c.recargo_calc);
+                t.total += Number(c.total); t.abonado += abonadoDe(c); t.saldo += saldoDe(c);
+                const vencido = !pagado && c.fecha_vencimiento && c.fecha_vencimiento < hoy;
+                const marcar = !pagado && (marcarVencidos ? vencido : marcados.has(String(c.id_pago)));
+                const recibo = c.recibo_id ? `<a class="icon-btn" title="Ver recibo" href="${window.BASE_URL}/recibo?id=${c.recibo_id}" target="_blank">🧾</a>` : '';
+                return `<tr data-id="${c.id_pago}">
+                    <td><input type="checkbox" class="alChk" ${pagado ? 'disabled' : ''} ${marcar ? 'checked' : ''} aria-label="Seleccionar ${esc(conceptoDe(c))}"></td>
+                    <td>${esc(conceptoDe(c))}</td>
+                    <td style="color:${vencido ? 'var(--rojo)' : 'inherit'}">${c.fecha_vencimiento ? c.fecha_vencimiento.split('-').reverse().join('/') : '—'}</td>
+                    <td class="num">${money(c.monto)}</td>
+                    <td class="num" style="color:${Number(c.descuento) ? 'var(--verde)' : 'inherit'}" title="${esc(c.concepto_descuento ?? '')}">${Number(c.descuento) ? '−' + money(c.descuento) : '—'}</td>
+                    <td class="num" style="color:${Number(c.recargo_calc) ? 'var(--rojo)' : 'inherit'}" title="${Number(c.recargo_monto) ? money(c.recargo_monto) + ' por mes vencido' : ''}">${o(c.recargo_calc)}</td>
+                    <td class="num"><strong>${money(c.total)}</strong></td>
+                    <td class="num">${o(abonadoDe(c))}</td>
+                    <td class="num">${o(saldoDe(c))}</td>
+                    <td><span class="badge-estatus ${est}">${esc(estatusMap[est] || est)}</span></td>
+                    <td><div class="acciones">${recibo}<button type="button" class="icon-btn borrar" title="Eliminar este pago"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button></div></td>
                 </tr>`;
             }).join('');
-            document.getElementById('cuentaPie').innerHTML = `<tr>
-                <td colspan="2">Totales</td>
+
+            document.getElementById('alPie').innerHTML = `<tr>
+                <td colspan="3">Totales</td>
                 <td class="num">${money(t.monto)}</td>
                 <td class="num">${t.descuento ? '−' + money(t.descuento) : '—'}</td>
                 <td class="num">${o(t.recargo)}</td>
                 <td class="num">${money(t.total)}</td>
                 <td class="num">${o(t.abonado)}</td>
                 <td class="num">${money(t.saldo)}</td>
-                <td></td></tr>`;
-            document.getElementById('cuentaTitulo').textContent = 'Estado de cuenta · ' + c.alumno;
-            document.getElementById('cuentaSub').textContent = (c.grado ?? 'Sin grupo') + ' · ' + suyos.length + ' pago(s)';
-            mCuenta.showModal();
+                <td colspan="2"></td></tr>`;
+            document.getElementById('alTitulo').textContent = suyos[0].alumno;
+            document.getElementById('alSub').textContent = (suyos[0].grado ?? 'Sin grupo') + ' · ' + suyos.length + ' pago(s)';
+
+            document.querySelectorAll('#alFilas .alChk').forEach(ch => ch.addEventListener('change', pintarSeleccion));
+            document.querySelectorAll('#alFilas .borrar').forEach(b => b.addEventListener('click', () =>
+                eliminar(todos.find(c => String(c.id_pago) === b.closest('tr').dataset.id))));
+            pintarSeleccion();
         }
 
-        /* ---------- Pago / abono ---------- */
-        function abrirPago(c) {
-            pagoId = c.id_pago;
-            const concepto = c.tipo === 'inscripcion' ? 'Inscripción' : c.mes;
-            const saldo = Number(c.saldo != null ? c.saldo : c.total);
-            const abon = Number(c.abonado || 0);
-            const pm = document.getElementById('pMonto');
-            pm.value = saldo.toFixed(2);
-            pm.max = saldo.toFixed(2);
-            document.getElementById('pagoInfo').innerHTML =
-                `<strong>${c.alumno}</strong> — ${concepto}<br>Total: ${money(c.total)}${abon ? ` · Abonado: ${money(abon)}` : ''} · Saldo: <strong>${money(saldo)}</strong>`;
-            mPago.showModal();
-        }
-        async function confirmarPago() {
-            const monto = Number(document.getElementById('pMonto').value);
-            if (!monto || monto <= 0) { window.notify('error', 'Captura un monto válido.'); return; }
-            const fd = new FormData();
-            fd.append('id_pago', pagoId);
-            fd.append('monto', monto);
-            fd.append('tipo_pago', document.getElementById('pTipo').value);
-            const d = await (await fetch(API + '?action=registrar_pago', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { mPago.close(); cargar(); }
+        // Pagos marcados en la ventana
+        function seleccion() {
+            const ids = [...document.querySelectorAll('#alFilas .alChk:checked')].map(ch => ch.closest('tr').dataset.id);
+            return todos.filter(c => ids.includes(String(c.id_pago)));
         }
 
-        /* ---------- Descuento (desde catálogo) ---------- */
-        function abrirDesc(c) {
-            descRow = c;
-            const aplica = c.tipo === 'inscripcion' ? 'inscripcion' : 'colegiatura';
-            const opciones = descuentos.filter(d => d.aplica_a === aplica);
-            const sel = document.getElementById('dTipo');
-            sel.innerHTML = '<option value="0">Sin descuento</option>' +
-                opciones.map(d => `<option value="${d.id_descuento}">${d.nombre} (${Number(d.porcentaje)}%)</option>`).join('');
-            sel.value = c.tipo_descuento_id ? String(c.tipo_descuento_id) : '0';
-            document.getElementById('descInfo').textContent =
-                `${c.alumno} — ${aplica === 'inscripcion' ? 'Inscripción' : c.mes} · Monto: ${money(c.monto)}`;
-            actualizarPreview();
-            if (!opciones.length) window.notify('info', 'No hay descuentos para este tipo. Créalos en «Tipos de descuento».');
-            mDesc.showModal();
+        function pintarSeleccion() {
+            const sel = seleccion();
+            const saldo = sel.reduce((s, c) => s + saldoDe(c), 0);
+            const libres = document.querySelectorAll('#alFilas .alChk:not(:disabled)');
+            document.getElementById('alTodos').checked = libres.length > 0 && sel.length === libres.length;
+            document.getElementById('alSeleccion').textContent = sel.length
+                ? `${sel.length} pago(s) seleccionado(s) · saldo ${money(saldo)}`
+                : 'Marca los pagos a los que quieras aplicar un descuento, un recargo o un pago.';
+
+            // Con un solo pago se puede abonar menos; con varios se salda cada uno completo
+            const monto = document.getElementById('aMonto');
+            monto.value = sel.length ? saldo.toFixed(2) : '';
+            monto.readOnly = sel.length !== 1;
+            document.getElementById('alAyuda').textContent = sel.length > 1
+                ? 'Al pagar varios a la vez se salda cada uno completo y se genera un recibo por pago.'
+                : (sel.length === 1 ? 'Deja el saldo completo para saldar, o captura menos para registrar un abono.' : '');
+            ['btnDesc', 'btnRec', 'btnPago'].forEach(id => document.getElementById(id).disabled = !sel.length);
         }
-        document.getElementById('dTipo').addEventListener('change', actualizarPreview);
-        function actualizarPreview() {
-            const id = document.getElementById('dTipo').value;
-            const d = descuentos.find(x => String(x.id_descuento) === id);
-            const prev = document.getElementById('descPreview');
-            if (!d || !descRow) { prev.textContent = ''; return; }
-            const monto = Number(descRow.monto) * Number(d.porcentaje) / 100;
-            prev.textContent = `Se aplicará −${money(monto)} (${Number(d.porcentaje)}%)`;
+        document.getElementById('alTodos').addEventListener('change', e => {
+            document.querySelectorAll('#alFilas .alChk:not(:disabled)').forEach(ch => ch.checked = e.target.checked);
+            pintarSeleccion();
+        });
+
+        /* ---------- Acciones en lote ---------- */
+
+        // Llama la acción para cada pago y avisa una sola vez con el resultado
+        async function enLote(pagos, accion, datos, hecho) {
+            if (!pagos.length) return;
+            const botones = ['btnDesc', 'btnRec', 'btnPago'].map(id => document.getElementById(id));
+            botones.forEach(b => b.disabled = true);
+            let ok = 0, error = '';
+            for (const c of pagos) {
+                const fd = new FormData();
+                fd.append('id_pago', c.id_pago);
+                Object.entries(datos(c)).forEach(([k, v]) => fd.append(k, v));
+                try {
+                    const d = await (await fetch(`${API}?action=${accion}`, { method: 'POST', body: fd })).json();
+                    if (d.success) ok++; else error = error || d.message;
+                } catch { error = error || 'No se pudo conectar con el servidor.'; }
+            }
+            const fallos = pagos.length - ok;
+            window.notify(fallos ? (ok ? 'warning' : 'error') : 'success',
+                (ok ? `${hecho} en ${ok} pago(s).` : '') + (fallos ? ` ${fallos} no se pudieron: ${error}` : ''));
+            await cargar();
         }
-        async function confirmarDescuento() {
-            const fd = new FormData();
-            fd.append('id_pago', descRow.id_pago);
-            fd.append('tipo_descuento_id', document.getElementById('dTipo').value);
-            const d = await (await fetch(API + '?action=descuento', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { mDesc.close(); cargar(); }
-        }
+
+        document.getElementById('btnDesc').addEventListener('click', () => {
+            const id = document.getElementById('aDesc').value;
+            const desc = descuentos.find(d => String(d.id_descuento) === id);
+            let sel = seleccion();
+            if (desc) {
+                // Cada descuento del catálogo es para inscripción o para colegiatura
+                const aplican = sel.filter(c => (c.tipo === 'inscripcion' ? 'inscripcion' : 'colegiatura') === desc.aplica_a);
+                if (!aplican.length) { window.notify('warning', 'Ese descuento no aplica a los pagos seleccionados.'); return; }
+                if (aplican.length < sel.length) window.notify('info', `${sel.length - aplican.length} pago(s) se omiten: el descuento no aplica a ese tipo.`);
+                sel = aplican;
+            }
+            enLote(sel, 'descuento', () => ({ tipo_descuento_id: id }), desc ? 'Descuento aplicado' : 'Descuento quitado');
+        });
+
+        document.getElementById('btnRec').addEventListener('click', () => {
+            const v = document.getElementById('aRec').value;
+            const monto = v === '' ? NaN : Number(v);
+            if (isNaN(monto) || monto < 0) { window.notify('error', 'Captura el recargo en pesos (0 para quitarlo).'); return; }
+            enLote(seleccion(), 'recargo', () => ({ recargo_monto: monto }), monto > 0 ? 'Recargo aplicado' : 'Recargo quitado');
+        });
+
+        document.getElementById('btnPago').addEventListener('click', async () => {
+            const sel = seleccion();
+            const metodo = document.getElementById('aMetodo').value;
+            const monto = Number(document.getElementById('aMonto').value);
+            if (sel.length === 1) {
+                if (!monto || monto <= 0) { window.notify('error', 'Captura un monto válido.'); return; }
+                return enLote(sel, 'registrar_pago', () => ({ monto, tipo_pago: metodo }), 'Pago registrado');
+            }
+            const total = sel.reduce((s, c) => s + saldoDe(c), 0);
+            if (!await window.confirmar(`Se saldarán ${sel.length} pagos por ${money(total)} en ${metodo.toLowerCase()} y se generará un recibo por cada uno.`,
+                { titulo: '¿Registrar los pagos?', confirmar: 'Registrar', peligro: false })) return;
+            enLote(sel, 'registrar_pago', () => ({ tipo_pago: metodo }), 'Pago registrado');
+        });
 
         async function eliminar(c) {
-            const concepto = c.tipo === 'inscripcion' ? 'la inscripción' : `la colegiatura (${c.mes})`;
+            const concepto = c.tipo === 'inscripcion' ? 'la inscripción' : `la colegiatura de ${conceptoDe(c)}`;
             if (!await window.confirmar(`¿Eliminar ${concepto} de ${c.alumno}?`)) return;
             const fd = new FormData(); fd.append('id_pago', c.id_pago);
             const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();

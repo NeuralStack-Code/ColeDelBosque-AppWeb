@@ -324,6 +324,24 @@ class ColegiaturaBusiness
         mysqli_stmt_close($up);
     }
 
+    /** Fija el recargo (pesos por mes vencido) de un pago que aún no está saldado. @return bool false = no existe o ya está pagado */
+    public function fijarRecargo(int $id, float $recargoMes): bool
+    {
+        $stPagado = statusId($this->db, 'pago', 'pagado');
+        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM colegiatura WHERE id_pago = ? AND (status_id IS NULL OR status_id <> ?) LIMIT 1');
+        mysqli_stmt_bind_param($chk, 'ii', $id, $stPagado);
+        mysqli_stmt_execute($chk);
+        $editable = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
+        mysqli_stmt_close($chk);
+        if (!$editable) return false;
+
+        $up = mysqli_prepare($this->db, 'UPDATE colegiatura SET recargo_monto = ? WHERE id_pago = ?');
+        mysqli_stmt_bind_param($up, 'di', $recargoMes, $id);
+        mysqli_stmt_execute($up);
+        mysqli_stmt_close($up);
+        return true;
+    }
+
     /** @return int filas afectadas (0 = no existía). */
     public function eliminar(int $id): int
     {

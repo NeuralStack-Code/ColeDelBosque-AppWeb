@@ -1,7 +1,7 @@
 <?php
 
 /**
- * Recurso: colegiaturas.  Ruta: /api/colegiaturas?action=catalogos|listar|registrar_pago|descuento|eliminar
+ * Recurso: colegiaturas.  Ruta: /api/colegiaturas?action=catalogos|listar|registrar_pago|descuento|recargo|eliminar
  * Pagos, abonos y descuentos de las colegiaturas (solo admin). Se generan desde esquemas-pago.
  */
 class ColegiaturaController
@@ -100,6 +100,17 @@ class ColegiaturaController
 
         $this->cole->aplicarDescuento($id, $descMonto, $tdId, $concepto);
         response(200, true, "Descuento aplicado: {$desc['nombre']} (−$" . number_format($descMonto, 2) . ').');
+    }
+
+    /** Recargo en pesos por cada mes vencido (0 = sin recargo). */
+    public function recargo(): void
+    {
+        $id    = (int) ($_POST['id_pago'] ?? 0);
+        $monto = filter_var($_POST['recargo_monto'] ?? '', FILTER_VALIDATE_FLOAT);
+        if ($id <= 0) response(400, false, 'Registro no válido.');
+        if ($monto === false || $monto < 0) response(400, false, 'El recargo no es válido.');
+        if (!$this->cole->fijarRecargo($id, (float) $monto)) response(409, false, 'No se puede: el pago no existe o ya está saldado.');
+        response(200, true, $monto > 0 ? 'Recargo aplicado.' : 'Recargo quitado.');
     }
 
     public function eliminar(): void

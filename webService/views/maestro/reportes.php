@@ -39,6 +39,10 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
     <section class="calif-wrap">
         <div class="calif-cab">
             <h2>Reporte semanal <span id="grado" style="color:var(--texto-suave);font-weight:400;"></span></h2>
+            <div class="selector" id="cajaGrupo" style="display:none;">
+                <label for="selGrupo">Grupo:</label>
+                <select id="selGrupo"></select>
+            </div>
             <div class="semana-nav">
                 <button type="button" id="semAnt" title="Semana anterior" aria-label="Semana anterior">‹</button>
                 <span id="semLbl">—</span>
@@ -113,6 +117,8 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         let ctx = { materias: [], columnas: [] };
         let sem = null;          // respuesta de ?action=semana
         let clase = null;        // clase abierta en el modal: { fecha, id_clase }
+        let grupoId = '';        // grupo en el que se captura (el propio o uno de sus niveles de inglés)
+        const selGrupo = document.getElementById('selGrupo');
 
         async function cerrarSesion() {
             try {
@@ -131,16 +137,20 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         /* ---------------- Semana ---------------- */
 
         async function cargarContexto() {
-            const d = await getJSON(API + '?action=contexto');
+            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=contexto');
             if (!d.success) { window.notify('error', d.message); return false; }
             ctx = d;
+            grupoId = d.grupo_id;
+            selGrupo.innerHTML = d.grupos.map(g => `<option value="${g.id_grupo}">${esc(g.grado)}${g.solo_ingles ? ' (inglés)' : ''}</option>`).join('');
+            selGrupo.value = d.grupo_id;
+            document.getElementById('cajaGrupo').style.display = d.grupos.length > 1 ? '' : 'none';
             document.getElementById('grado').textContent = d.grado ? '· ' + d.grado : '';
             selMateria.innerHTML = d.materias.map(m => `<option value="${m.id_materia}">${esc(m.nombre)}</option>`).join('');
             return true;
         }
 
         async function cargarSemana(inicio = '') {
-            const d = await getJSON(API + '?action=semana&inicio=' + encodeURIComponent(inicio));
+            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=semana&inicio=' + encodeURIComponent(inicio));
             if (!d.success) { window.notify('error', d.message); return; }
             sem = d;
             document.getElementById('semLbl').textContent = `${corta(d.dias[0])} al ${corta(d.dias[4])}`;
@@ -169,7 +179,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
                     <div class="rep-dia-cab"><strong>${DIAS[i]}</strong><span>${corta(fecha)}</span></div>
                     <div class="rep-clases">
                         ${clases.map(c => `
-                            <button type="button" class="rep-clase" data-materia="${c.materia_id}">
+                            <button type="button" class="rep-clase" data-materia="${c.materia_id}" ${ctx.materias.some(m => String(m.id_materia) === String(c.materia_id)) ? '' : 'disabled title="Clase de otra maestra"'}>
                                 <strong>${esc(c.materia)}</strong>
                                 <span>${esc(c.tema) || 'Sin tema'}</span>
                                 ${Number(c.incidencias) ? `<em>${c.incidencias} con incidencia</em>` : ''}
@@ -219,7 +229,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
         // Trae tema e incidencias de (día, materia); si no existe, deja todo en blanco
         async function cargarClase() {
-            const d = await getJSON(`${API}?action=clase&fecha=${clase.fecha}&materia_id=${encodeURIComponent(selMateria.value)}`);
+            const d = await getJSON(`${API}?grupo_id=${grupoId}&action=clase&fecha=${clase.fecha}&materia_id=${encodeURIComponent(selMateria.value)}`);
             if (!d.success) { window.notify('error', d.message); return; }
             clase.id_clase = d.id_clase;
             document.getElementById('claseTema').value = d.tema;
@@ -249,7 +259,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             fd.append('materia_id', selMateria.value);
             fd.append('tema', document.getElementById('claseTema').value);
             fd.append('marcas', JSON.stringify(marcas));
-            const d = await getJSON(API + '?action=guardar_clase', { method: 'POST', body: fd });
+            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=guardar_clase', { method: 'POST', body: fd });
             window.notifyResponse(d);
             if (d.success) { dlgClase.close(); cargarSemana(sem.inicio); }
         });
@@ -258,7 +268,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             if (!clase.id_clase) return;
             if (!await window.confirmar('¿Eliminar esta clase y sus incidencias? Ya no saldrá en el reporte.')) return;
             const fd = new FormData(); fd.append('id_clase', clase.id_clase);
-            const d = await getJSON(API + '?action=eliminar_clase', { method: 'POST', body: fd });
+            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=eliminar_clase', { method: 'POST', body: fd });
             window.notifyResponse(d);
             if (d.success) { dlgClase.close(); cargarSemana(sem.inicio); }
         });
@@ -301,7 +311,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         }
 
         async function vistaPrevia(a) {
-            const d = await getJSON(`${API}?action=vista_previa&cuenta_id=${a.id_cuenta}&inicio=${sem.inicio}`);
+            const d = await getJSON(`${API}?grupo_id=${grupoId}&action=vista_previa&cuenta_id=${a.id_cuenta}&inicio=${sem.inicio}`);
             if (!d.success) { window.notify('error', d.message); return; }
             document.getElementById('previaAsunto').textContent = d.asunto;
             dlgPrevia.showModal();
@@ -318,7 +328,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             const fd = new FormData();
             fd.append('cuenta_id', a.id_cuenta);
             fd.append('inicio', sem.inicio);
-            const d = await getJSON(API + '?action=enviar', { method: 'POST', body: fd });
+            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=enviar', { method: 'POST', body: fd });
             if (d.success) a.enviado_en = d.enviado_en;
             return d;
         }
@@ -348,6 +358,11 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             pintarEnvio();
             window.notify(fallos ? 'warning' : 'success',
                 `${ok} reporte(s) enviado(s).` + (fallos ? ` ${fallos} no se pudieron enviar; inténtalo de nuevo desde su fila.` : ''));
+        });
+
+        selGrupo.addEventListener('change', async () => {
+            grupoId = selGrupo.value;
+            if (await cargarContexto()) cargarSemana(sem ? sem.inicio : '');
         });
 
         (async () => { if (await cargarContexto()) cargarSemana(); })();

@@ -2,12 +2,15 @@
 
 /**
  * Recurso: calificaciones.  Ruta: /api/calificaciones?action=contexto|listar|guardar
- * Notas por (alumno, materia, ciclo activo). Solo maestros (permiso 2), acotado a su grupo.
+ * Notas por (alumno, materia, ciclo activo). Solo maestros (permiso 2), acotado a sus grupos:
+ * el propio (todas las materias) y los de sus niveles de inglés (solo Inglés). El grupo llega en grupo_id.
  */
 class CalificacionController
 {
     private CalificacionBusiness $cal;
     private int   $grupoId;
+    private bool  $soloIngles;
+    private array $grupos;
     private int   $cicloId;
     private array $ciclo;
 
@@ -19,12 +22,20 @@ class CalificacionController
         }
         $this->cal = new CalificacionBusiness($conexion);
 
-        $this->grupoId = $this->cal->grupoDelMaestro((int) ($_SESSION['id'] ?? 0));
-        $ciclo         = $this->cal->cicloActivo();
-        if ($this->grupoId <= 0) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
-        if (!$ciclo)             response(409, false, 'No hay un ciclo escolar activo. Pide al administrador que active uno.');
+        $ciclo = $this->cal->cicloActivo();
+        if (!$ciclo) response(409, false, 'No hay un ciclo escolar activo. Pide al administrador que active uno.');
         $this->ciclo   = $ciclo;
         $this->cicloId = (int) $ciclo['id_ciclo'];
+
+        $this->grupos = $this->cal->gruposDelMaestro((int) ($_SESSION['id'] ?? 0), $this->cicloId);
+        if (!$this->grupos) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
+
+        // Grupo pedido por la vista; sin él (o si no es suyo) se usa el primero
+        $pedido = (int) ($_REQUEST['grupo_id'] ?? 0);
+        $actual = $this->grupos[0];
+        foreach ($this->grupos as $g) if ($g['id_grupo'] === $pedido) $actual = $g;
+        $this->grupoId    = $actual['id_grupo'];
+        $this->soloIngles = $actual['solo_ingles'];
     }
 
     /** '' → null; si no, float validado 0–10. */
@@ -41,8 +52,9 @@ class CalificacionController
     {
         response(200, true, 'Contexto obtenido.', [
             'grupo_id' => $this->grupoId,
+            'grupos'   => $this->grupos,
             'grado'    => $this->cal->gradoDeGrupo($this->grupoId),
-            'materias' => $this->cal->materiasDeGrupo($this->grupoId),
+            'materias' => $this->cal->materiasDeGrupo($this->grupoId, $this->soloIngles),
             'ciclo'    => $this->ciclo['nombre'],
         ]);
     }
@@ -50,7 +62,7 @@ class CalificacionController
     public function listar(): void
     {
         $materiaId = (int) ($_GET['materia_id'] ?? 0);
-        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId)) {
+        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId, $this->soloIngles)) {
             response(400, false, 'Materia no válida para tu grupo.');
         }
         response(200, true, 'Calificaciones obtenidas.', [
@@ -63,7 +75,7 @@ class CalificacionController
         $cuentaId  = (int) ($_POST['cuenta_id']  ?? 0);
         $materiaId = (int) ($_POST['materia_id'] ?? 0);
         if ($cuentaId <= 0) response(400, false, 'Alumno no válido.');
-        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId)) {
+        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId, $this->soloIngles)) {
             response(400, false, 'Materia no válida para tu grupo.');
         }
         if (!$this->cal->alumnoEnGrupo($cuentaId, $this->grupoId)) {

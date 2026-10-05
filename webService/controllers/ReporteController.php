@@ -2,7 +2,8 @@
 
 /**
  * Recurso: reportes.  Ruta: /api/reportes?action=contexto|semana|clase|guardar_clase|eliminar_clase|vista_previa|enviar
- * Reporte semanal a papás. Solo maestros (permiso 2), acotado a su grupo.
+ * Reporte semanal a papás. Solo maestros (permiso 2), acotado a sus grupos: el propio (todas las
+ * materias) y los de sus niveles de inglés (solo Inglés). El grupo llega en grupo_id.
  */
 class ReporteController
 {
@@ -11,6 +12,8 @@ class ReporteController
     private ReporteCorreoBusiness  $correo;
     private CalificacionBusiness   $cal;      // contexto del maestro (grupo, ciclo, materias)
     private int   $grupoId;
+    private bool  $soloIngles;
+    private array $grupos;
     private int   $cicloId;
     private array $ciclo;
 
@@ -25,12 +28,20 @@ class ReporteController
         $this->correo = new ReporteCorreoBusiness();
         $this->cal    = new CalificacionBusiness($conexion);
 
-        $this->grupoId = $this->cal->grupoDelMaestro((int) ($_SESSION['id'] ?? 0));
-        $ciclo         = $this->cal->cicloActivo();
-        if ($this->grupoId <= 0) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
-        if (!$ciclo)             response(409, false, 'No hay un ciclo escolar activo. Pide al administrador que active uno.');
+        $ciclo = $this->cal->cicloActivo();
+        if (!$ciclo) response(409, false, 'No hay un ciclo escolar activo. Pide al administrador que active uno.');
         $this->ciclo   = $ciclo;
         $this->cicloId = (int) $ciclo['id_ciclo'];
+
+        $this->grupos = $this->cal->gruposDelMaestro((int) ($_SESSION['id'] ?? 0), $this->cicloId);
+        if (!$this->grupos) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
+
+        // Grupo pedido por la vista; sin él (o si no es suyo) se usa el primero
+        $pedido = (int) ($_REQUEST['grupo_id'] ?? 0);
+        $actual = $this->grupos[0];
+        foreach ($this->grupos as $g) if ($g['id_grupo'] === $pedido) $actual = $g;
+        $this->grupoId    = $actual['id_grupo'];
+        $this->soloIngles = $actual['solo_ingles'];
     }
 
     /* ---------------- Helpers ---------------- */
@@ -53,7 +64,7 @@ class ReporteController
 
     private function materiaValida(int $materiaId): void
     {
-        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId)) {
+        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId, $this->soloIngles)) {
             response(400, false, 'Materia no válida para tu grupo.');
         }
     }
@@ -83,8 +94,10 @@ class ReporteController
     public function contexto(): void
     {
         response(200, true, 'Contexto obtenido.', [
+            'grupo_id' => $this->grupoId,
+            'grupos'   => $this->grupos,
             'grado'    => $this->cal->gradoDeGrupo($this->grupoId),
-            'materias' => $this->cal->materiasDeGrupo($this->grupoId),
+            'materias' => $this->cal->materiasDeGrupo($this->grupoId, $this->soloIngles),
             'columnas' => $this->cols->listar(true),
             'ciclo'    => $this->ciclo['nombre'],
         ]);
@@ -166,6 +179,8 @@ class ReporteController
     {
         $id = (int) ($_POST['id_clase'] ?? 0);
         if ($id <= 0) response(400, false, 'Registro no válido.');
+        // El maestro de inglés solo borra clases de Inglés
+        $this->materiaValida($this->rep->materiaDeClase($id, $this->grupoId));
         if ($this->rep->eliminarClase($id, $this->grupoId) === 0) response(404, false, 'No se encontró la clase.');
         response(200, true, 'Clase eliminada.');
     }

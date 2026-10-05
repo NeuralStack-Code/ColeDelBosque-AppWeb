@@ -39,6 +39,10 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
     <section class="calif-wrap">
         <div class="calif-cab">
             <h2>Reportes y calificaciones <span id="grado" style="color:var(--texto-suave);font-weight:400;"></span></h2>
+            <div class="selector" id="cajaGrupo" style="display:none;">
+                <label for="selGrupo">Grupo:</label>
+                <select id="selGrupo"></select>
+            </div>
             <div class="selector">
                 <label for="materia">Materia:</label>
                 <select id="materia"><option value="">Selecciona…</option></select>
@@ -66,6 +70,8 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         const tabla = document.getElementById('tabla');
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
+        const selGrupo = document.getElementById('selGrupo');
+        let grupoId = '';   // grupo en el que se captura (el propio o uno de sus niveles de inglés)
 
         async function cerrarSesion() {
             try {
@@ -79,10 +85,18 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         // Cargar contexto (materias del grupo)
         async function cargarContexto() {
             try {
-                const r = await fetch(API + '?action=contexto');
+                const r = await fetch(API + '?grupo_id=' + grupoId + '&action=contexto');
                 const d = await r.json();
                 if (!d.success) { window.notify('error', d.message); return; }
                 document.getElementById('grado').textContent = d.grado ? '· ' + d.grado : '';
+                grupoId = d.grupo_id;
+                selGrupo.innerHTML = d.grupos.map(g => `<option value="${g.id_grupo}">${g.grado}${g.solo_ingles ? ' (inglés)' : ''}</option>`).join('');
+                selGrupo.value = d.grupo_id;
+                document.getElementById('cajaGrupo').style.display = d.grupos.length > 1 ? '' : 'none';
+                selMateria.innerHTML = '<option value="">Selecciona…</option>';
+                tabla.style.display = 'none';
+                vacio.style.display = 'block';
+                vacio.textContent = 'Selecciona una materia para ver a tus alumnos.';
                 d.materias.forEach(m => {
                     const opt = document.createElement('option');
                     opt.value = m.id_materia;
@@ -95,7 +109,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
         // Cargar alumnos + notas de la materia elegida
         async function cargarAlumnos(materiaId) {
-            const r = await fetch(API + '?action=listar&materia_id=' + encodeURIComponent(materiaId));
+            const r = await fetch(API + '?grupo_id=' + grupoId + '&action=listar&materia_id=' + encodeURIComponent(materiaId));
             const d = await r.json();
             if (!d.success) { window.notify('error', d.message); return; }
             filas.innerHTML = '';
@@ -145,7 +159,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             tr.querySelectorAll('input').forEach(i => fd.append(i.dataset.f, i.value));
             btn.disabled = true;
             try {
-                const r = await fetch(API + '?action=guardar', { method: 'POST', body: fd });
+                const r = await fetch(API + '?grupo_id=' + grupoId + '&action=guardar', { method: 'POST', body: fd });
                 window.notifyResponse(await r.json());
             } catch { window.notify('error', 'No se pudo guardar.'); }
             btn.disabled = false;
@@ -155,6 +169,8 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             if (selMateria.value) cargarAlumnos(selMateria.value);
             else { tabla.style.display = 'none'; vacio.style.display = 'block'; }
         });
+
+        selGrupo.addEventListener('change', () => { grupoId = selGrupo.value; cargarContexto(); });
 
         cargarContexto();
     </script>

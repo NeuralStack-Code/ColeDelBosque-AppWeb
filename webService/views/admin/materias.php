@@ -56,7 +56,7 @@ $img = $base . '/webService/wwwroot/img';
                 <div class="campo"><label>Nombre</label><input type="text" id="nombre" placeholder="Ej. Matemáticas" required></div>
                 <div class="campo">
                     <label>Grupos donde se imparte</label>
-                    <div class="chips" id="gruposCheck" style="flex-direction:column;align-items:stretch;gap:6px;max-height:220px;overflow:auto;"></div>
+                    <div class="lista-check" id="gruposCheck"></div>
                     <small id="sinGrupos" style="color:var(--texto-suave);display:none;">No hay grupos aún.</small>
                 </div>
                 <div class="modal-acciones">
@@ -93,7 +93,7 @@ $img = $base . '/webService/wwwroot/img';
             const sel = new Set(seleccionados.map(Number));
             document.getElementById('sinGrupos').style.display = grupos.length ? 'none' : 'block';
             cont.innerHTML = grupos.map(g => `
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                <label>
                     <input type="checkbox" value="${g.id_grupo}" ${sel.has(Number(g.id_grupo)) ? 'checked' : ''}>
                     <span>${g.grado}${g.ciclo_nombre ? ' · ' + g.ciclo_nombre : ''}</span>
                 </label>`).join('');

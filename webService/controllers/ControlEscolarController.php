@@ -41,6 +41,21 @@ class ControlEscolarController
         return strtolower($c);
     }
 
+    /** Niveles de inglés marcados al maestro → 'basico,medio' o null si no da inglés. */
+    private function nivelesIngles(): ?string
+    {
+        $marcados = json_decode($_POST['niveles_ingles'] ?? '[]', true) ?: [];
+        $niveles  = array_values(array_intersect(['basico', 'medio', 'avanzado'], $marcados));
+        return $niveles ? implode(',', $niveles) : null;
+    }
+
+    /** Nivel de inglés del grupo: basico | medio | avanzado, o null. */
+    private function nivelIngles(): ?string
+    {
+        $n = $_POST['nivel_ingles'] ?? '';
+        return in_array($n, ['basico', 'medio', 'avanzado'], true) ? $n : null;
+    }
+
     private function crearPersona(int $permiso): void
     {
         $nombre  = trim($_POST['nombre']  ?? '');
@@ -49,7 +64,12 @@ class ControlEscolarController
         $grupo   = (int) ($_POST['grado'] ?? 0);
         $mat     = trim($_POST['matricula'] ?? '');
 
-        if ($grupo <= 0) response(400, false, 'Selecciona un grupo válido.');
+        // Un maestro que solo da inglés no necesita grupo propio (queda en el comodín 0)
+        $niveles = $permiso === 2 ? $this->nivelesIngles() : null;
+        if ($grupo <= 0 && $niveles === null) {
+            response(400, false, $permiso === 2 ? 'Selecciona un grupo o marca los niveles de inglés que imparte.' : 'Selecciona un grupo válido.');
+        }
+        if ($grupo < 0) $grupo = 0;
         $this->validarNombres($nombre, $paterno, $materno);
         if (!$this->matriculaValida($mat)) response(400, false, 'La matrícula debe tener 3 mayúsculas y 6 números (AAA######).');
         if ($this->ce->matriculaExiste($mat)) response(409, false, 'La matrícula ya existe. Cambia algún dígito e inténtalo de nuevo.');
@@ -59,6 +79,7 @@ class ControlEscolarController
         if (!$this->ce->crearPersona($nombre, $paterno, $materno, $grupo, $mat, $permiso)) {
             response(500, false, 'No se pudo crear la cuenta.');
         }
+        if ($niveles !== null) $this->ce->guardarNivelesIngles($this->ce->idCuentaPorMatricula($mat), $niveles);
         $etiqueta = $permiso === 2 ? 'maestro' : 'alumno';
         $msg = "¡Se ha registrado un nuevo $etiqueta!";
         if ($correo1 !== '' || $correo2 !== '') {
@@ -118,6 +139,15 @@ class ControlEscolarController
             response(500, false, 'No se pudo actualizar la cuenta.');
         }
         if ($permiso === 3) $this->ce->guardarCorreosTutor($id, $correo1, $correo2);
+        if ($permiso === 2) {
+            $niveles = $this->nivelesIngles();
+            $this->ce->guardarNivelesIngles($id, $niveles);
+            // "Sin grupo" elegido a propósito: solo se permite si da inglés
+            if (($_POST['sin_grupo'] ?? '') === '1') {
+                if ($niveles === null) response(400, false, 'Sin grupo propio, el maestro debe tener al menos un nivel de inglés.');
+                $this->ce->quitarGrupo($id);
+            }
+        }
         response(200, true, 'Se ha actualizado la información.');
     }
 
@@ -188,6 +218,7 @@ class ControlEscolarController
         if ($grupoId <= 0) response(500, false, 'No se pudo crear el grupo.');
 
         $this->ce->sincronizarMateriasGrupo($grupoId, $materiaIds);
+        $this->ce->grupoSetNivelIngles($grupoId, $this->nivelIngles());
         response(201, true, '¡Se ha creado el grupo y sus materias!');
     }
 
@@ -205,6 +236,8 @@ class ControlEscolarController
 
         if (isset($_POST['nivel']) && $_POST['nivel'] !== '')       { $this->ce->grupoSetNivel($grupoId, (int) $_POST['nivel']); $cambios++; }
         if (isset($_POST['ciclo_id']) && $_POST['ciclo_id'] !== '') { $this->ce->grupoSetCiclo($grupoId, (int) $_POST['ciclo_id']); $cambios++; }
+
+        if (isset($_POST['nivel_ingles'])) { $this->ce->grupoSetNivelIngles($grupoId, $this->nivelIngles()); $cambios++; }
 
         if (isset($_POST['materia_ids']) || isset($_POST['materias_nuevas'])) {
             $materiaIds = $this->ce->resolverMaterias(

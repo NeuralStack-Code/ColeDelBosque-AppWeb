@@ -184,6 +184,17 @@ dialog.modal.ancho { max-width: 880px; }   /* modales con tabla (desglose, estad
 .desglose-scroll { max-height: 46vh; overflow: auto; border: 1px solid var(--borde); border-radius: var(--radio-sm); margin-bottom: 14px; }
 .enlace-alumno { background: none; border: none; padding: 0; font: inherit; color: var(--azul-marca); font-weight: 600; cursor: pointer; text-align: left; }
 .enlace-alumno:hover { text-decoration: underline; }
+
+/* Cuenta del alumno: acciones en lote sobre los pagos marcados */
+.tabla-desglose input[type="checkbox"] { width: 18px; height: 18px; padding: 0; accent-color: var(--azul-marca); cursor: pointer; }
+.tabla-desglose input[type="checkbox"]:disabled { opacity: .35; cursor: default; }
+.cuenta-acciones { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.cuenta-bloque { display: flex; flex-direction: column; gap: 8px; padding: 14px; border: 1px solid var(--borde); border-radius: var(--radio-sm); }
+.cuenta-bloque label { margin: 0; }
+.cuenta-bloque .fila-2 { gap: 8px; }
+.cuenta-bloque .btn { justify-content: center; padding: .55em 1em; font-size: .9rem; margin-top: auto; }
+.cuenta-bloque .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.modal-in input[readonly] { color: var(--texto-suave); }
 .modal-in h3 { font-family: var(--fuente-titulo); font-size: 1.4rem; margin-bottom: 18px; }
 .modal-in .campo { margin-bottom: 16px; }
 .modal-in label { display: block; font-family: var(--fuente-titulo); font-weight: 500; font-size: .9rem; margin-bottom: 6px; }
@@ -197,6 +208,12 @@ dialog.modal.ancho { max-width: 880px; }   /* modales con tabla (desglose, estad
 .modal-acciones { display: flex; gap: 12px; justify-content: flex-end; margin-top: 22px; }
 .modal-acciones .btn { padding: .65em 1.4em; }
 .fila-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* Lista de casillas dentro de un modal (materias del grupo, etc.): casilla pegada a su texto */
+.lista-check { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 4px 12px; max-height: 220px; overflow: auto; padding: 8px; background: var(--fondo-alt); border-radius: var(--radio-sm); }
+.modal-in .lista-check label { display: flex; align-items: center; gap: 10px; margin: 0; padding: 7px 8px; border-radius: 8px; font-family: var(--fuente-texto); font-weight: 600; cursor: pointer; }
+.modal-in .lista-check label:hover { background: #fff; }
+.modal-in .lista-check input[type="checkbox"] { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; accent-color: var(--azul-marca); cursor: pointer; }
 
 /* ---------- Pestañas ---------- */
 .tabs { display: flex; gap: 6px; margin-bottom: 24px; border-bottom: 2px solid var(--borde); }
