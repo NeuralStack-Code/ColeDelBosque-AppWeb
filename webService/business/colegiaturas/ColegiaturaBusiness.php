@@ -16,16 +16,16 @@ class ColegiaturaBusiness
         $this->db = $db;
     }
 
-    /** Recargo vigente (en vivo) para un pago no pagado y vencido. */
-    public function recargoVigente(float $monto, float $pct, ?string $venc, string $estatus): float
+    /** Recargo vigente (en vivo) de un pago no pagado y vencido: cantidad fija por cada mes vencido. */
+    public function recargoVigente(float $recargoMes, ?string $venc, string $estatus): float
     {
-        if (strtolower($estatus) === 'pagado' || $pct <= 0 || !$venc) return 0.0;
+        if (strtolower($estatus) === 'pagado' || $recargoMes <= 0 || !$venc) return 0.0;
         try { $hoy = new DateTime('today'); $v = new DateTime($venc); }
         catch (Exception $e) { return 0.0; }
         if ($v >= $hoy) return 0.0;
         $meses = ((int) $hoy->format('Y') - (int) $v->format('Y')) * 12 + ((int) $hoy->format('n') - (int) $v->format('n'));
         if ($meses < 1) $meses = 1;
-        return round($monto * $pct / 100 * $meses, 2);
+        return round($recargoMes * $meses, 2);
     }
 
     /** id del ciclo activo (0 si no hay). */
@@ -104,7 +104,7 @@ class ColegiaturaBusiness
             $desc  = (float) $r['descuento'];
             $recargo = strtolower($r['estatus']) === 'pagado'
                 ? (float) $r['recargo']
-                : $this->recargoVigente($monto, (float) $r['recargo_pct'], $r['fecha_vencimiento'], $r['estatus']);
+                : $this->recargoVigente((float) $r['recargo_monto'], $r['fecha_vencimiento'], $r['estatus']);
             $abonado = (float) $r['abonado'];
             $total   = max(0, $monto + $recargo - $desc);
             $r['alumno']       = trim("$r[nombre] $r[paterno] $r[materno]");
@@ -141,67 +141,72 @@ class ColegiaturaBusiness
         return $alumnos;
     }
 
-    /** Genera inscripción + colegiaturas mensuales. @return array{creados:int,actualizados:int,saltados:int} */
-    public function generarEsquema(array $alumnos, int $cicloId, float $montoCol, float $montoIns, int $anio, int $mesInicio, int $numMeses, int $diaVenc, float $recPct): array
+    /**
+     * Pagos que produce un esquema, en orden: inscripción (si tiene costo) y una colegiatura por mes.
+     * Sin SQL: es lo mismo que se muestra en la vista previa y lo que guarda generarEsquema().
+     * @return array<int,array{tipo:string,mes:string,anio:int,fecha_vencimiento:string,monto:float,recargo_monto:float}>
+     */
+    public function calendarioEsquema(float $montoCol, float $montoIns, int $anio, int $mesInicio, int $numMeses, int $diaVenc, float $recMonto): array
+    {
+        $pagos = [];
+        if ($montoIns > 0) {
+            $pagos[] = [
+                'tipo' => 'inscripcion', 'mes' => 'Inscripción', 'anio' => $anio,
+                'fecha_vencimiento' => sprintf('%04d-%02d-%02d', $anio, $mesInicio, $diaVenc),
+                'monto' => $montoIns, 'recargo_monto' => 0.0,   // la inscripción no genera recargo
+            ];
+        }
+        for ($k = 0; $k < $numMeses; $k++) {
+            $mn = ($mesInicio - 1 + $k) % 12 + 1;
+            $an = $anio + intdiv($mesInicio - 1 + $k, 12);
+            $pagos[] = [
+                'tipo' => 'colegiatura', 'mes' => self::MESES[$mn], 'anio' => $an,
+                'fecha_vencimiento' => sprintf('%04d-%02d-%02d', $an, $mn, $diaVenc),
+                'monto' => $montoCol, 'recargo_monto' => $recMonto,
+            ];
+        }
+        return $pagos;
+    }
+
+    /**
+     * Guarda los pagos del calendario para cada alumno. Los pagados no se tocan; los pendientes
+     * se actualizan si cambió el monto o el recargo.
+     * @param array $pagos salida de calendarioEsquema()
+     * @return array{creados:int,actualizados:int,saltados:int}
+     */
+    public function generarEsquema(array $alumnos, int $cicloId, array $pagos): array
     {
         $creados = 0; $actualizados = 0; $saltados = 0;
         $stPendiente = statusId($this->db, 'pago', 'pendiente');
 
-        $chkIns = mysqli_prepare($this->db,
-            'SELECT col.id_pago, s.clave AS estatus, col.monto FROM colegiatura col
+        // La inscripción es una por ciclo; la colegiatura se identifica por mes + año
+        $chk = mysqli_prepare($this->db,
+            'SELECT col.id_pago, s.clave AS estatus, col.monto, col.recargo_monto FROM colegiatura col
              LEFT JOIN status s ON s.id_status = col.status_id
-             WHERE col.cuenta_id = ? AND col.ciclo_id = ? AND col.tipo = "inscripcion" LIMIT 1');
-        $insIns = mysqli_prepare($this->db,
-            'INSERT INTO colegiatura (cuenta_id, ciclo_id, mes, tipo, monto, status_id, fecha_vencimiento, recargo_pct)
-             VALUES (?, ?, "Inscripción", "inscripcion", ?, ?, ?, 0)');
-        $updIns = mysqli_prepare($this->db, 'UPDATE colegiatura SET monto = ? WHERE id_pago = ?');
-
-        $chkCol = mysqli_prepare($this->db,
-            'SELECT col.id_pago, s.clave AS estatus, col.monto FROM colegiatura col
-             LEFT JOIN status s ON s.id_status = col.status_id
-             WHERE col.cuenta_id = ? AND col.ciclo_id = ? AND col.tipo = "colegiatura" AND col.mes = ? AND YEAR(col.fecha_vencimiento) = ? LIMIT 1');
-        $insCol = mysqli_prepare($this->db,
-            'INSERT INTO colegiatura (cuenta_id, ciclo_id, mes, tipo, monto, status_id, fecha_vencimiento, recargo_pct)
-             VALUES (?, ?, ?, "colegiatura", ?, ?, ?, ?)');
-        $updCol = mysqli_prepare($this->db, 'UPDATE colegiatura SET monto = ?, recargo_pct = ? WHERE id_pago = ?');
+             WHERE col.cuenta_id = ? AND col.ciclo_id = ? AND col.tipo = ?
+               AND (col.tipo = "inscripcion" OR (col.mes = ? AND YEAR(col.fecha_vencimiento) = ?)) LIMIT 1');
+        $ins = mysqli_prepare($this->db,
+            'INSERT INTO colegiatura (cuenta_id, ciclo_id, mes, tipo, monto, status_id, fecha_vencimiento, recargo_pct, recargo_monto)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)');
+        $upd = mysqli_prepare($this->db, 'UPDATE colegiatura SET monto = ?, recargo_monto = ? WHERE id_pago = ?');
 
         foreach ($alumnos as $cid) {
-            if ($montoIns > 0) {
-                mysqli_stmt_bind_param($chkIns, 'ii', $cid, $cicloId);
-                mysqli_stmt_execute($chkIns);
-                $ex = mysqli_fetch_assoc(mysqli_stmt_get_result($chkIns));
+            foreach ($pagos as $p) {
+                mysqli_stmt_bind_param($chk, 'iissi', $cid, $cicloId, $p['tipo'], $p['mes'], $p['anio']);
+                mysqli_stmt_execute($chk);
+                $ex = mysqli_fetch_assoc(mysqli_stmt_get_result($chk));
                 if (!$ex) {
-                    $venc = sprintf('%04d-%02d-%02d', $anio, $mesInicio, $diaVenc);
-                    mysqli_stmt_bind_param($insIns, 'iidis', $cid, $cicloId, $montoIns, $stPendiente, $venc);
-                    if (mysqli_stmt_execute($insIns)) $creados++;
-                } elseif (strtolower($ex['estatus']) !== 'pagado' && (float) $ex['monto'] != $montoIns) {
+                    mysqli_stmt_bind_param($ins, 'iissdisd', $cid, $cicloId, $p['mes'], $p['tipo'], $p['monto'], $stPendiente, $p['fecha_vencimiento'], $p['recargo_monto']);
+                    if (mysqli_stmt_execute($ins)) $creados++;
+                } elseif (strtolower((string) $ex['estatus']) !== 'pagado'
+                    && ((float) $ex['monto'] != $p['monto'] || (float) $ex['recargo_monto'] != $p['recargo_monto'])) {
                     $eid = (int) $ex['id_pago'];
-                    mysqli_stmt_bind_param($updIns, 'di', $montoIns, $eid);
-                    mysqli_stmt_execute($updIns); $actualizados++;
-                } else { $saltados++; }
-            }
-
-            for ($k = 0; $k < $numMeses; $k++) {
-                $mn = ($mesInicio - 1 + $k) % 12 + 1;
-                $an = $anio + intdiv($mesInicio - 1 + $k, 12);
-                $mesNombre = self::MESES[$mn];
-                $venc = sprintf('%04d-%02d-%02d', $an, $mn, $diaVenc);
-
-                mysqli_stmt_bind_param($chkCol, 'iisi', $cid, $cicloId, $mesNombre, $an);
-                mysqli_stmt_execute($chkCol);
-                $ex = mysqli_fetch_assoc(mysqli_stmt_get_result($chkCol));
-                if (!$ex) {
-                    mysqli_stmt_bind_param($insCol, 'iisdisd', $cid, $cicloId, $mesNombre, $montoCol, $stPendiente, $venc, $recPct);
-                    if (mysqli_stmt_execute($insCol)) $creados++;
-                } elseif (strtolower($ex['estatus']) !== 'pagado' && (float) $ex['monto'] != $montoCol) {
-                    $eid = (int) $ex['id_pago'];
-                    mysqli_stmt_bind_param($updCol, 'ddi', $montoCol, $recPct, $eid);
-                    mysqli_stmt_execute($updCol); $actualizados++;
+                    mysqli_stmt_bind_param($upd, 'ddi', $p['monto'], $p['recargo_monto'], $eid);
+                    mysqli_stmt_execute($upd); $actualizados++;
                 } else { $saltados++; }
             }
         }
-        mysqli_stmt_close($chkIns); mysqli_stmt_close($insIns); mysqli_stmt_close($updIns);
-        mysqli_stmt_close($chkCol); mysqli_stmt_close($insCol); mysqli_stmt_close($updCol);
+        mysqli_stmt_close($chk); mysqli_stmt_close($ins); mysqli_stmt_close($upd);
 
         return ['creados' => $creados, 'actualizados' => $actualizados, 'saltados' => $saltados];
     }
@@ -210,7 +215,7 @@ class ColegiaturaBusiness
     public function colegiaturaParaPago(int $id): ?array
     {
         $q = mysqli_prepare($this->db,
-            'SELECT col.cuenta_id, col.mes, col.tipo, col.monto, s.clave AS estatus, col.recargo_pct, col.descuento, col.fecha_vencimiento
+            'SELECT col.cuenta_id, col.mes, col.tipo, col.monto, s.clave AS estatus, col.recargo_monto, col.descuento, col.fecha_vencimiento
              FROM colegiatura col LEFT JOIN status s ON s.id_status = col.status_id WHERE col.id_pago = ? LIMIT 1');
         mysqli_stmt_bind_param($q, 'i', $id);
         mysqli_stmt_execute($q);

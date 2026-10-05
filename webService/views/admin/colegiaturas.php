@@ -32,7 +32,7 @@ $img = $base . '/webService/wwwroot/img';
             <h2>Colegiaturas <small id="cicloRotulo" style="font-size:.9rem;color:var(--texto-suave);font-weight:600;"></small></h2>
             <div style="display:flex;gap:10px;">
                 <a class="btn btn-fantasma" href="<?= $base ?>/administrador/tipos-descuento">Tipos de descuento</a>
-                <button class="btn btn-primario" onclick="abrirGenerar()">+ Generar esquema</button>
+                <a class="btn btn-primario" href="<?= $base ?>/administrador/esquemas-pago">Esquemas de pago</a>
             </div>
         </div>
 
@@ -50,45 +50,23 @@ $img = $base . '/webService/wwwroot/img';
                 <tbody id="filas"></tbody>
             </table>
         </div>
-        <p class="tabla-vacia" id="vacio" style="display:none;">No hay colegiaturas. Genera un esquema para empezar.</p>
+        <p class="tabla-vacia" id="vacio" style="display:none;">No hay colegiaturas. Aplica un esquema de pago para empezar.</p>
     </section>
 
-    <!-- Modal generar esquema -->
-    <dialog class="modal" id="mGen">
+    <!-- Estado de cuenta del alumno: todos sus pagos del ciclo, mes por mes -->
+    <dialog class="modal ancho" id="mCuenta">
         <div class="modal-in">
-            <h3>Generar esquema de pagos</h3>
-            <div class="fila-2">
-                <div class="campo"><label>Costo de inscripción ($)</label><input type="number" id="gMontoIns" min="0" step="0.01" placeholder="0 = sin inscripción"></div>
-                <div class="campo"><label>Colegiatura mensual ($)</label><input type="number" id="gMontoCol" min="0" step="0.01" required></div>
+            <h3 id="cuentaTitulo">Estado de cuenta</h3>
+            <p id="cuentaSub" style="color:var(--texto-suave);margin-bottom:14px;"></p>
+            <div class="desglose-scroll">
+                <table class="tabla-desglose">
+                    <thead><tr><th>Concepto</th><th>Vence</th><th class="num">Monto</th><th class="num">Descuento</th><th class="num">Recargo</th><th class="num">Total</th><th class="num">Abonado</th><th class="num">Saldo</th><th>Estatus</th></tr></thead>
+                    <tbody id="cuentaFilas"></tbody>
+                    <tfoot id="cuentaPie"></tfoot>
+                </table>
             </div>
-            <div class="fila-2">
-                <div class="campo"><label>Recargo por mes vencido (%)</label><input type="number" id="gRec" min="0" step="0.1" value="0"></div>
-                <div class="campo"><label>Día de vencimiento</label><input type="number" id="gDia" min="1" max="28" value="10"></div>
-            </div>
-            <div class="fila-2">
-                <div class="campo"><label>Año</label><input type="number" id="gAnio" min="2020" max="2100"></div>
-                <div class="campo"><label># de mensualidades</label><input type="number" id="gNum" min="1" max="24" value="10"></div>
-            </div>
-            <div class="campo"><label>Mes de inicio</label><select id="gMesIni"></select></div>
-
-            <div class="campo"><label>Aplicar a</label>
-                <select id="gAplicarA">
-                    <option value="todos">Todos los alumnos</option>
-                    <option value="alumno">Un alumno específico</option>
-                </select>
-            </div>
-
-            <div id="gEspecifico" style="display:none;border-top:1px dashed var(--borde,#eceafb);padding-top:14px;margin-top:4px;">
-                <div class="fila-2">
-                    <div class="campo"><label>Grupo del ciclo</label><select id="gAlGrupo"><option value="">Todos</option></select></div>
-                    <div class="campo"><label>Buscar (nombre o matrícula)</label><input type="text" id="gAlBuscar" placeholder="Escribe para filtrar…"></div>
-                </div>
-                <div class="campo"><label>Alumno</label><select id="gAlSel" size="6" style="height:auto;"></select></div>
-            </div>
-
             <div class="modal-acciones">
-                <button type="button" class="btn btn-fantasma" onclick="mGen.close()">Cancelar</button>
-                <button type="button" class="btn btn-primario" onclick="generar()">Generar</button>
+                <button type="button" class="btn btn-fantasma" onclick="mCuenta.close()">Cerrar</button>
             </div>
         </div>
     </dialog>
@@ -151,9 +129,6 @@ $img = $base . '/webService/wwwroot/img';
             (d.estatus || []).forEach(s => estatusMap[s.clave] = s.nombre);
             const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
             document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' + opts;
-            document.getElementById('gAlGrupo').innerHTML = '<option value="">Todos</option>' + opts;
-            document.getElementById('gMesIni').innerHTML = MESES.slice(1).map((n, i) => `<option value="${i + 1}">${n}</option>`).join('');
-            document.getElementById('gAnio').value = new Date().getFullYear();
             document.getElementById('cicloRotulo').textContent = d.ciclo ? '· ' + d.ciclo.nombre : '· sin ciclo activo';
         }
 
@@ -210,7 +185,7 @@ $img = $base . '/webService/wwwroot/img';
                     ? `<br><small style="color:var(--texto-suave)">Abonado ${money(c.abonado)} · Saldo <strong>${money(c.saldo)}</strong></small>` : '';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${c.alumno}</td>
+                    <td><button type="button" class="enlace-alumno" title="Ver estado de cuenta">${c.alumno}</button></td>
                     <td>${c.grado ?? '—'}</td>
                     <td>${concepto}</td>
                     <td>${c.fecha_vencimiento ?? '—'}</td>
@@ -222,6 +197,7 @@ $img = $base . '/webService/wwwroot/img';
                     <td><div class="acciones">${acciones}
                         <button class="icon-btn borrar" title="Eliminar" data-a="del"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
                     </div></td>`;
+                tr.querySelector('.enlace-alumno').addEventListener('click', () => abrirCuenta(c));
                 tr.querySelectorAll('[data-a]').forEach(b => b.addEventListener('click', () => {
                     if (b.dataset.a === 'pago') abrirPago(c);
                     else if (b.dataset.a === 'desc') abrirDesc(c);
@@ -233,54 +209,44 @@ $img = $base . '/webService/wwwroot/img';
         document.getElementById('fGrupo').addEventListener('change', () => { actualizarMeses(); render(); });
         ['fTipo', 'fMes', 'fEstatus', 'fBuscar'].forEach(id => document.getElementById(id).addEventListener('input', render));
 
-        /* ---------- Generar ---------- */
-        function abrirGenerar() {
-            document.getElementById('gAplicarA').value = 'todos';
-            document.getElementById('gEspecifico').style.display = 'none';
-            document.getElementById('gAlBuscar').value = '';
-            document.getElementById('gAlGrupo').value = '';
-            pintarAlumnos();
-            mGen.showModal();
-        }
-        document.getElementById('gAplicarA').addEventListener('change', e => {
-            document.getElementById('gEspecifico').style.display = e.target.value === 'alumno' ? 'block' : 'none';
-        });
-        document.getElementById('gAlGrupo').addEventListener('change', pintarAlumnos);
-        document.getElementById('gAlBuscar').addEventListener('input', pintarAlumnos);
-
-        function pintarAlumnos() {
-            const grp = document.getElementById('gAlGrupo').value;
-            const q = document.getElementById('gAlBuscar').value.toLowerCase().trim();
-            const f = alumnos.filter(a => {
-                if (grp && String(a.grupo_id) !== grp) return false;
-                if (q && !(`${a.nombre} ${a.matricula}`.toLowerCase().includes(q))) return false;
-                return true;
-            });
-            const sel = document.getElementById('gAlSel');
-            sel.innerHTML = f.length
-                ? f.map(a => `<option value="${a.id_cuenta}">${a.nombre} — ${a.matricula} (${a.grado})</option>`).join('')
-                : '<option value="" disabled>Sin coincidencias</option>';
-        }
-
-        async function generar() {
-            const aplicarA = document.getElementById('gAplicarA').value;
-            const fd = new FormData();
-            fd.append('monto_colegiatura', document.getElementById('gMontoCol').value);
-            fd.append('monto_inscripcion', document.getElementById('gMontoIns').value || 0);
-            fd.append('recargo_pct', document.getElementById('gRec').value);
-            fd.append('anio', document.getElementById('gAnio').value);
-            fd.append('dia_venc', document.getElementById('gDia').value);
-            fd.append('mes_inicio', document.getElementById('gMesIni').value);
-            fd.append('num_meses', document.getElementById('gNum').value);
-            fd.append('aplicar_a', aplicarA);
-            if (aplicarA === 'alumno') {
-                const cuenta = document.getElementById('gAlSel').value;
-                if (!cuenta) { window.notify('error', 'Selecciona un alumno.'); return; }
-                fd.append('cuenta_id', cuenta);
-            }
-            const d = await (await fetch(API + '?action=generar', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { mGen.close(); cargar(); }
+        /* ---------- Estado de cuenta ---------- */
+        function abrirCuenta(c) {
+            const suyos = todos.filter(x => String(x.cuenta_id) === String(c.cuenta_id))
+                .sort((a, b) => (a.tipo === 'inscripcion' ? 0 : 1) - (b.tipo === 'inscripcion' ? 0 : 1)
+                    || String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento)));
+            const t = { monto: 0, descuento: 0, recargo: 0, total: 0, abonado: 0, saldo: 0 };
+            const o = v => Number(v) ? money(v) : '—';
+            document.getElementById('cuentaFilas').innerHTML = suyos.map(x => {
+                const est = (x.estatus || 'pendiente').toLowerCase();
+                const saldo = est === 'pagado' ? 0 : Number(x.saldo);
+                const abonado = est === 'pagado' ? Number(x.total) : Number(x.abonado);
+                t.monto += Number(x.monto); t.descuento += Number(x.descuento); t.recargo += Number(x.recargo_calc);
+                t.total += Number(x.total); t.abonado += abonado; t.saldo += saldo;
+                const venc = x.fecha_vencimiento ? x.fecha_vencimiento.split('-').reverse().join('/') : '—';
+                return `<tr>
+                    <td>${x.tipo === 'inscripcion' ? 'Inscripción' : (x.mes ?? '') + (x.fecha_vencimiento ? ' ' + x.fecha_vencimiento.slice(0, 4) : '')}</td>
+                    <td>${venc}</td>
+                    <td class="num">${money(x.monto)}</td>
+                    <td class="num" style="color:${Number(x.descuento) ? 'var(--verde)' : 'inherit'}">${Number(x.descuento) ? '−' + money(x.descuento) : '—'}</td>
+                    <td class="num" style="color:${Number(x.recargo_calc) ? 'var(--rojo)' : 'inherit'}">${o(x.recargo_calc)}</td>
+                    <td class="num"><strong>${money(x.total)}</strong></td>
+                    <td class="num">${o(abonado)}</td>
+                    <td class="num">${o(saldo)}</td>
+                    <td><span class="badge-estatus ${est}">${estatusMap[est] || est}</span></td>
+                </tr>`;
+            }).join('');
+            document.getElementById('cuentaPie').innerHTML = `<tr>
+                <td colspan="2">Totales</td>
+                <td class="num">${money(t.monto)}</td>
+                <td class="num">${t.descuento ? '−' + money(t.descuento) : '—'}</td>
+                <td class="num">${o(t.recargo)}</td>
+                <td class="num">${money(t.total)}</td>
+                <td class="num">${o(t.abonado)}</td>
+                <td class="num">${money(t.saldo)}</td>
+                <td></td></tr>`;
+            document.getElementById('cuentaTitulo').textContent = 'Estado de cuenta · ' + c.alumno;
+            document.getElementById('cuentaSub').textContent = (c.grado ?? 'Sin grupo') + ' · ' + suyos.length + ' pago(s)';
+            mCuenta.showModal();
         }
 
         /* ---------- Pago / abono ---------- */

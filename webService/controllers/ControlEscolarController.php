@@ -59,11 +59,41 @@ class ControlEscolarController
         if (!$this->ce->crearPersona($nombre, $paterno, $materno, $grupo, $mat, $permiso)) {
             response(500, false, 'No se pudo crear la cuenta.');
         }
-        if ($correo1 !== '' || $correo2 !== '') {
-            $this->ce->guardarCorreosTutor($this->ce->idCuentaPorMatricula($mat), $correo1, $correo2);
-        }
         $etiqueta = $permiso === 2 ? 'maestro' : 'alumno';
-        response(201, true, "¡Se ha registrado un nuevo $etiqueta!");
+        $msg = "¡Se ha registrado un nuevo $etiqueta!";
+        if ($correo1 !== '' || $correo2 !== '') {
+            $idCuenta = $this->ce->idCuentaPorMatricula($mat);
+            $this->ce->guardarCorreosTutor($idCuenta, $correo1, $correo2);
+            // Alta con correo: la familia recibe su matrícula de una vez
+            $msg .= $this->mandarMatricula($idCuenta) > 0
+                ? ' Se envió la matrícula al correo del tutor.'
+                : ' No se pudo enviar la matrícula por correo; reenvíala desde la lista.';
+        }
+        response(201, true, $msg);
+    }
+
+    /** Envía la matrícula a los tutores. @return int correos enviados (-1 = sin correo registrado). */
+    private function mandarMatricula(int $idCuenta): int
+    {
+        $a = $this->ce->alumnoParaCorreo($idCuenta);
+        if (!$a) response(404, false, 'No se encontró al alumno.');
+        if (!$a['correos']) return -1;
+
+        $r = (new MatriculaCorreoBusiness())->enviar($a['correos'], $a['nombre'], $a['matricula']);
+        if ($r['errores']) error_log('Matrícula no enviada: ' . implode(' | ', $r['errores']));
+        return $r['enviados'];
+    }
+
+    /** Botón "enviar matrícula" de la lista de alumnos. */
+    public function alumno_enviar_matricula(): void
+    {
+        $id = (int) ($_POST['id_cuenta'] ?? 0);
+        if ($id <= 0) response(400, false, 'Registro no válido.');
+
+        $enviados = $this->mandarMatricula($id);
+        if ($enviados === -1) response(409, false, 'El alumno no tiene correo de tutor. Agrégalo en su ficha.');
+        if ($enviados === 0)  response(502, false, 'No se pudo enviar el correo.');
+        response(200, true, 'Matrícula enviada al correo del tutor.');
     }
 
     private function editarPersona(int $permiso): void

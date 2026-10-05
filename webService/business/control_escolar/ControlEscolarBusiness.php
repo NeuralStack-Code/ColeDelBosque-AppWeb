@@ -74,6 +74,30 @@ class ControlEscolarBusiness
         return $ok;
     }
 
+    /** Lo necesario para mandarle su matrícula a los tutores: nombre, matrícula y correos (o null). */
+    public function alumnoParaCorreo(int $idCuenta): ?array
+    {
+        $q = mysqli_prepare($this->db,
+            'SELECT c.matricula, c.correo_tutor, c.correo_tutor2, u.nombre, u.paterno, u.materno
+             FROM cuenta c JOIN usuario u ON u.id_usuario = c.usuario_id
+             WHERE c.id_cuenta = ? AND c.permiso_id = 3 LIMIT 1');
+        mysqli_stmt_bind_param($q, 'i', $idCuenta);
+        mysqli_stmt_execute($q);
+        $r = mysqli_fetch_assoc(mysqli_stmt_get_result($q));
+        mysqli_stmt_close($q);
+        if (!$r) return null;
+
+        $correos = [];
+        foreach (['correo_tutor', 'correo_tutor2'] as $campo) {
+            if (!empty($r[$campo])) $correos[] = (string) decrypt($r[$campo]);
+        }
+        return [
+            'nombre'    => trim("$r[nombre] $r[paterno] $r[materno]"),
+            'matricula' => (string) decrypt($r['matricula']),
+            'correos'   => array_values(array_unique(array_filter($correos))),
+        ];
+    }
+
     public function obtenerUsuarioId(int $idCuenta): ?int
     {
         $q = mysqli_prepare($this->db, 'SELECT usuario_id FROM cuenta WHERE id_cuenta = ? LIMIT 1');

@@ -1,8 +1,8 @@
 <?php
 
 /**
- * Recurso: colegiaturas.  Ruta: /api/colegiaturas?action=catalogos|listar|generar|registrar_pago|descuento|eliminar
- * Esquema de pagos por ciclo (solo admin).
+ * Recurso: colegiaturas.  Ruta: /api/colegiaturas?action=catalogos|listar|registrar_pago|descuento|eliminar
+ * Pagos, abonos y descuentos de las colegiaturas (solo admin). Se generan desde esquemas-pago.
  */
 class ColegiaturaController
 {
@@ -24,48 +24,6 @@ class ColegiaturaController
         response(200, true, 'Colegiaturas obtenidas.', ['items' => $this->cole->listar()]);
     }
 
-    public function generar(): void
-    {
-        $montoCol  = filter_var($_POST['monto_colegiatura'] ?? '', FILTER_VALIDATE_FLOAT);
-        $montoIns  = filter_var($_POST['monto_inscripcion'] ?? '0', FILTER_VALIDATE_FLOAT);
-        $anio      = (int) ($_POST['anio'] ?? 0);
-        $mesInicio = (int) ($_POST['mes_inicio'] ?? 0);
-        $numMeses  = (int) ($_POST['num_meses'] ?? 0);
-        $diaVenc   = (int) ($_POST['dia_venc'] ?? 1);
-        $recPct    = (float) ($_POST['recargo_pct'] ?? 0);
-        $aplicarA  = ($_POST['aplicar_a'] ?? 'todos') === 'alumno' ? 'alumno' : 'todos';
-        $cuentaSel = (int) ($_POST['cuenta_id'] ?? 0);
-
-        if ($montoCol === false || $montoCol <= 0) response(400, false, 'Monto de colegiatura no válido.');
-        if ($montoIns === false || $montoIns < 0)  response(400, false, 'Monto de inscripción no válido.');
-        if ($anio < 2020 || $anio > 2100)          response(400, false, 'Año no válido.');
-        if ($mesInicio < 1 || $mesInicio > 12)     response(400, false, 'Mes de inicio no válido.');
-        if ($numMeses < 1 || $numMeses > 24)       response(400, false, 'Número de mensualidades no válido.');
-        if ($diaVenc < 1 || $diaVenc > 28)         response(400, false, 'Día de vencimiento entre 1 y 28.');
-
-        $cicloId = $this->cole->cicloActivoId();
-        if ($cicloId <= 0) response(409, false, 'No hay un ciclo escolar activo. Actívalo antes de generar.');
-
-        if ($aplicarA === 'alumno') {
-            if ($cuentaSel <= 0) response(400, false, 'Selecciona un alumno.');
-            if (!$this->cole->alumnoEnCicloActivo($cuentaSel, $cicloId)) {
-                response(404, false, 'El alumno no está en un grupo del ciclo activo.');
-            }
-            $alumnos = [$cuentaSel];
-        } else {
-            $alumnos = $this->cole->alumnosDelCicloActivo($cicloId);
-        }
-        if (!$alumnos) response(409, false, 'No hay alumnos en el ciclo activo para generar el esquema.');
-
-        $c = $this->cole->generarEsquema($alumnos, $cicloId, $montoCol, $montoIns, $anio, $mesInicio, $numMeses, $diaVenc, $recPct);
-
-        $msg = "Esquema generado: {$c['creados']} nuevo(s)";
-        if ($c['actualizados']) $msg .= ", {$c['actualizados']} actualizado(s)";
-        if ($c['saltados'])     $msg .= ", {$c['saltados']} sin cambios";
-        $msg .= '.';
-        response(201, true, $msg);
-    }
-
     public function registrar_pago(): void
     {
         $id   = (int) ($_POST['id_pago'] ?? 0);
@@ -81,7 +39,7 @@ class ColegiaturaController
 
         $monto   = (float) $col['monto'];
         $desc    = (float) $col['descuento'];
-        $recargo = $this->cole->recargoVigente($monto, (float) $col['recargo_pct'], $col['fecha_vencimiento'], $col['estatus']);
+        $recargo = $this->cole->recargoVigente((float) $col['recargo_monto'], $col['fecha_vencimiento'], $col['estatus']);
         $total   = max(0, $monto + $recargo - $desc);
         $cuentaId = (int) $col['cuenta_id'];
         $esInscripcion = $col['tipo'] === 'inscripcion';

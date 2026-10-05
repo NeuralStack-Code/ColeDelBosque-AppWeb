@@ -60,6 +60,7 @@ $routes = [
     'administrador/tipos-descuento' => __DIR__ . '/webService/views/admin/tipos_descuento.php',
     'administrador/materias'      => __DIR__ . '/webService/views/admin/materias.php',
     'administrador/ciclos'        => __DIR__ . '/webService/views/admin/ciclos.php',
+    'administrador/esquemas-pago' => __DIR__ . '/webService/views/admin/esquemas_pago.php',
     'administrador/reporte-columnas' => __DIR__ . '/webService/views/admin/reporte_columnas.php',
 
     //Desarrollador (permiso_id = 4)

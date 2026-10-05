@@ -31,6 +31,7 @@ $img = $base . '/webService/wwwroot/img';
         <div class="admin-cab">
             <h2>Finanzas</h2>
             <div style="display:flex;gap:10px;">
+                <a class="btn btn-fantasma" href="<?= $base ?>/administrador/esquemas-pago">Esquemas de pago</a>
                 <a class="btn btn-fantasma" href="<?= $base ?>/administrador/tipos-recibo">Tipos de recibo</a>
                 <button class="btn btn-primario" onclick="abrirAlta()">+ Nuevo recibo</button>
             </div>

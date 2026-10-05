@@ -53,6 +53,7 @@ $controllers = [
     'control-escolar' => ['ControlEscolarController',  'principal'],
     'reportes'        => ['ReporteController',         'principal'],
     'reporte-columnas'=> ['ReporteColumnaController',  'principal'],
+    'esquemas-pago'   => ['EsquemaPagoController',     'principal'],
 ];
 
 try {

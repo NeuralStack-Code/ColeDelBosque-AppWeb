@@ -15,3 +15,4 @@ _pendientes.sql
 _prev_*.html
 _dev*.php
 /*.sql
+/storage/*.log

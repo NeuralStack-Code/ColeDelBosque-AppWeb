@@ -14,16 +14,16 @@ class PadreBusiness
         $this->db = $db;
     }
 
-    /** Recargo vigente para una colegiatura no pagada y vencida. */
-    private function recargoVigente(float $monto, float $pct, ?string $venc, string $estatus): float
+    /** Recargo vigente de una colegiatura no pagada y vencida: cantidad fija por cada mes vencido. */
+    private function recargoVigente(float $recargoMes, ?string $venc, string $estatus): float
     {
-        if (strtolower($estatus) === 'pagado' || $pct <= 0 || !$venc) return 0.0;
+        if (strtolower($estatus) === 'pagado' || $recargoMes <= 0 || !$venc) return 0.0;
         try { $hoy = new DateTime('today'); $v = new DateTime($venc); }
         catch (Exception $e) { return 0.0; }
         if ($v >= $hoy) return 0.0;
         $meses = ((int) $hoy->format('Y') - (int) $v->format('Y')) * 12 + ((int) $hoy->format('n') - (int) $v->format('n'));
         if ($meses < 1) $meses = 1;
-        return round($monto * $pct / 100 * $meses, 2);
+        return round($recargoMes * $meses, 2);
     }
 
     /** Correos de tutor (ENCRIPTADOS; '' → NULL) de la cuenta del alumno logueado. */
@@ -90,7 +90,7 @@ class PadreBusiness
         $pagos = [];
         $p = mysqli_prepare($this->db,
             'SELECT col.id_pago, col.mes, col.tipo, col.monto, s.clave AS estatus, col.fecha_pago, col.fecha_vencimiento,
-                    col.recargo_pct, col.recargo, col.descuento, col.concepto_descuento, col.recibo_id,
+                    col.recargo_monto, col.recargo, col.descuento, col.concepto_descuento, col.recibo_id,
                     (SELECT COALESCE(SUM(rr.monto),0) FROM recibo rr WHERE rr.colegiatura_id = col.id_pago) AS abonado
              FROM colegiatura col LEFT JOIN status s ON s.id_status = col.status_id
              WHERE col.cuenta_id = ? ORDER BY col.tipo DESC, col.fecha_vencimiento ASC');
@@ -102,7 +102,7 @@ class PadreBusiness
             $desc  = (float) $r['descuento'];
             $recargo = strtolower($r['estatus']) === 'pagado'
                 ? (float) $r['recargo']
-                : $this->recargoVigente($monto, (float) $r['recargo_pct'], $r['fecha_vencimiento'], $r['estatus']);
+                : $this->recargoVigente((float) $r['recargo_monto'], $r['fecha_vencimiento'], $r['estatus']);
             $abonado = (float) $r['abonado'];
             $total   = max(0, $monto + $recargo - $desc);
             $r['recargo_calc'] = $recargo;
