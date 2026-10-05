@@ -294,7 +294,6 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('alAyuda').textContent = sel.length > 1
                 ? 'Al pagar varios a la vez se salda cada uno completo y se genera un recibo por pago.'
                 : (sel.length === 1 ? 'Deja el saldo completo para saldar, o captura menos para registrar un abono.' : '');
-            ['btnDesc', 'btnRec', 'btnPago'].forEach(id => document.getElementById(id).disabled = !sel.length);
         }
         document.getElementById('alTodos').addEventListener('change', e => {
             document.querySelectorAll('#alFilas .alChk:not(:disabled)').forEach(ch => ch.checked = e.target.checked);
@@ -304,6 +303,13 @@ $img = $base . '/webService/wwwroot/img';
         /* ---------- Acciones en lote ---------- */
 
         // Llama la acción para cada pago y avisa una sola vez con el resultado
+        // Los botones nunca se apagan: sin pagos marcados avisan qué falta
+        function haySeleccion() {
+            if (seleccion().length) return true;
+            window.notify('warning', 'Primero marca en la tabla los pagos a los que se aplicará.');
+            return false;
+        }
+
         async function enLote(pagos, accion, datos, hecho) {
             if (!pagos.length) return;
             const botones = ['btnDesc', 'btnRec', 'btnPago'].map(id => document.getElementById(id));
@@ -322,9 +328,11 @@ $img = $base . '/webService/wwwroot/img';
             window.notify(fallos ? (ok ? 'warning' : 'error') : 'success',
                 (ok ? `${hecho} en ${ok} pago(s).` : '') + (fallos ? ` ${fallos} no se pudieron: ${error}` : ''));
             await cargar();
+            botones.forEach(b => b.disabled = false);
         }
 
         document.getElementById('btnDesc').addEventListener('click', () => {
+            if (!haySeleccion()) return;
             const id = document.getElementById('aDesc').value;
             const desc = descuentos.find(d => String(d.id_descuento) === id);
             let sel = seleccion();
@@ -339,6 +347,7 @@ $img = $base . '/webService/wwwroot/img';
         });
 
         document.getElementById('btnRec').addEventListener('click', () => {
+            if (!haySeleccion()) return;
             const v = document.getElementById('aRec').value;
             const monto = v === '' ? NaN : Number(v);
             if (isNaN(monto) || monto < 0) { window.notify('error', 'Captura el recargo en pesos (0 para quitarlo).'); return; }
@@ -346,6 +355,7 @@ $img = $base . '/webService/wwwroot/img';
         });
 
         document.getElementById('btnPago').addEventListener('click', async () => {
+            if (!haySeleccion()) return;
             const sel = seleccion();
             const metodo = document.getElementById('aMetodo').value;
             const monto = Number(document.getElementById('aMonto').value);
