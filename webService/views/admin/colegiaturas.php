@@ -86,8 +86,9 @@ $img = $base . '/webService/wwwroot/img';
                 </div>
                 <div class="cuenta-bloque">
                     <label for="aRec">Recargo por mes vencido ($)</label>
-                    <input type="number" id="aRec" min="0" step="0.01" placeholder="0 = sin recargo">
-                    <button type="button" class="btn btn-fantasma" id="btnRec">Aplicar recargo</button>
+                    <input type="number" id="aRec" min="0" step="0.01">
+                    <small id="aRecNota" style="color:var(--texto-suave);font-size:.8rem;"></small>
+                    <button type="button" class="btn btn-fantasma" id="btnRec">Cambiar recargo</button>
                 </div>
                 <div class="cuenta-bloque">
                     <label for="aMonto">Pago ($)</label>
@@ -208,7 +209,6 @@ $img = $base . '/webService/wwwroot/img';
 
         function abrirCuenta(cuentaId) {
             cuentaAbierta = cuentaId;
-            document.getElementById('aRec').value = '';
             document.getElementById('aDesc').innerHTML = '<option value="0">Quitar descuento</option>'
                 + descuentos.map(d => `<option value="${d.id_descuento}">${esc(d.nombre)} (${Number(d.porcentaje)}% · ${d.aplica_a === 'inscripcion' ? 'inscripción' : 'colegiatura'})</option>`).join('');
             pintarCuenta(true);
@@ -277,6 +277,16 @@ $img = $base . '/webService/wwwroot/img';
                 ? `${sel.length} pago(s) seleccionado(s) · saldo ${money(saldo)}`
                 : 'Marca los pagos a los que quieras aplicar un descuento, un recargo o un pago.';
 
+            // El recargo viene del esquema de pago: aquí se muestra el que ya tienen y solo se cambia como excepción
+            const recargos = [...new Set(sel.map(c => Number(c.recargo_monto)))];
+            const rec = document.getElementById('aRec');
+            rec.value = recargos.length === 1 ? recargos[0].toFixed(2) : '';
+            rec.placeholder = recargos.length > 1 ? 'Varios' : '';
+            document.getElementById('aRecNota').textContent = !sel.length ? 'Lo define el esquema de pago.'
+                : recargos.length > 1 ? 'Los pagos marcados tienen recargos distintos.'
+                : (recargos[0] > 0 ? 'Es el del esquema de pago; cámbialo solo como excepción (0 lo quita).'
+                                   : 'El esquema no tiene recargo; aquí puedes poner uno a estos pagos.');
+
             // Con un solo pago se puede abonar menos; con varios se salda cada uno completo
             const monto = document.getElementById('aMonto');
             monto.value = sel.length ? saldo.toFixed(2) : '';
@@ -332,7 +342,7 @@ $img = $base . '/webService/wwwroot/img';
             const v = document.getElementById('aRec').value;
             const monto = v === '' ? NaN : Number(v);
             if (isNaN(monto) || monto < 0) { window.notify('error', 'Captura el recargo en pesos (0 para quitarlo).'); return; }
-            enLote(seleccion(), 'recargo', () => ({ recargo_monto: monto }), monto > 0 ? 'Recargo aplicado' : 'Recargo quitado');
+            enLote(seleccion(), 'recargo', () => ({ recargo_monto: monto }), monto > 0 ? 'Recargo actualizado' : 'Recargo quitado');
         });
 
         document.getElementById('btnPago').addEventListener('click', async () => {

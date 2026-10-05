@@ -11,6 +11,11 @@ $extraCss = $extraCss ?? [];
 $extraJs  = $extraJs  ?? [];
 if (!defined('BASE_URL')) require_once __DIR__ . '/../../../apiService/core/config.php';
 $base = BASE_URL;
+
+// Versión por fecha de modificación: al subir un CSS/JS nuevo el navegador lo vuelve a pedir
+// (sin esto se queda con la copia vieja en caché y la página se ve desacomodada).
+$wwwroot = __DIR__ . '/../../wwwroot/';
+$ver = static fn(string $rel): string => $rel . '?v=' . (@filemtime($wwwroot . $rel) ?: 1);
 ?>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -27,18 +32,18 @@ $base = BASE_URL;
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
 <!-- CSS base -->
-<link rel="stylesheet" href="<?= $base ?>/webService/wwwroot/CSS/reset.css">
-<link rel="stylesheet" href="<?= $base ?>/webService/wwwroot/CSS/style.css">
+<link rel="stylesheet" href="<?= $base ?>/webService/wwwroot/<?= $ver('CSS/reset.css') ?>">
+<link rel="stylesheet" href="<?= $base ?>/webService/wwwroot/<?= $ver('CSS/style.css') ?>">
 
 <!-- Confirmador global (window.confirmar) -->
-<script src="<?= $base ?>/webService/wwwroot/JavaScript/confirm.js" defer></script>
+<script src="<?= $base ?>/webService/wwwroot/<?= $ver('JavaScript/confirm.js') ?>" defer></script>
 
 <!-- CSS extra por página -->
 <?php foreach ($extraCss as $css): ?>
-<link rel="stylesheet" href="<?= $base ?>/webService/wwwroot/CSS/<?= htmlspecialchars($css) ?>">
+<link rel="stylesheet" href="<?= $base ?>/webService/wwwroot/<?= htmlspecialchars($ver('CSS/' . $css)) ?>">
 <?php endforeach; ?>
 
 <!-- JS extra por página -->
 <?php foreach ($extraJs as $js): ?>
-<script src="<?= $base ?>/webService/wwwroot/JavaScript/<?= htmlspecialchars($js) ?>"></script>
+<script src="<?= $base ?>/webService/wwwroot/<?= htmlspecialchars($ver('JavaScript/' . $js)) ?>"></script>
 <?php endforeach; ?>

@@ -175,10 +175,14 @@ dialog.modal {
 }
 dialog.modal::backdrop { background: rgba(26,23,48,.5); backdrop-filter: blur(2px); }
 .modal-in { padding: 30px 32px; }
-dialog.modal.ancho { max-width: 880px; }   /* modales con tabla (desglose, estado de cuenta) */
-.tabla-desglose { width: 100%; border-collapse: collapse; font-size: .9rem; }
+dialog.modal.ancho { max-width: 1080px; }   /* modales con tabla (desglose, estado de cuenta) */
+.tabla-desglose { width: 100%; border-collapse: collapse; font-size: .86rem; }
 .tabla-desglose th { font-family: var(--fuente-titulo); font-size: .8rem; color: var(--azul-osc); background: var(--azul-claro); padding: 9px 10px; text-align: left; white-space: nowrap; position: sticky; top: 0; }
-.tabla-desglose td { padding: 8px 10px; border-top: 1px solid var(--borde); }
+.tabla-desglose td { padding: 7px 8px; border-top: 1px solid var(--borde); white-space: nowrap; }
+.tabla-desglose th { padding-left: 8px; padding-right: 8px; }
+.tabla-desglose .badge-estatus { font-size: .72rem; padding: .25em .7em; }
+.tabla-desglose .icon-btn { width: 28px; height: 28px; }
+.tabla-desglose .acciones { display: flex; gap: 4px; justify-content: flex-end; }
 .tabla-desglose .num { text-align: right; white-space: nowrap; }
 .tabla-desglose tfoot td { font-weight: 700; background: var(--fondo-alt); border-top: 2px solid var(--borde); }
 .desglose-scroll { max-height: 46vh; overflow: auto; border: 1px solid var(--borde); border-radius: var(--radio-sm); margin-bottom: 14px; }
