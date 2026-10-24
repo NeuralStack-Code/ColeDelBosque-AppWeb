@@ -1,11 +1,8 @@
 <?php
-$rol = 3; // solo padre/alumno
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Portal del alumno. La pinta PadreController::index(). Recibe $base y $nombre. Su JavaScript llama a /padre/<método>. */
 $title = 'Mi portal | Colegio del Bosque';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
-$nombre = $_SESSION['usuario'] ?? 'Alumno';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -15,12 +12,12 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/padre" class="marca">
+            <a href="<?= $base ?>/padre/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Portal del alumno</small></span>
             </a>
             <div style="display:flex;align-items:center;gap:1.2em;">
-                <span class="user">Hola, <strong><?= htmlspecialchars($nombre) ?></strong></span>
+                <span class="user">Hola, <strong><?= e($nombre ?: 'Alumno') ?></strong></span>
                 <button class="btn-salir" onclick="cerrarSesion()">Cerrar sesión</button>
             </div>
         </div>
@@ -65,23 +62,24 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
     </section>
 
     <script>
-        const API = window.BASE_URL + '/api/padre';
+        const API = window.BASE_URL + '/padre';
         const money = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargar() {
             let d;
-            try { d = await (await fetch(API + '?action=resumen')).json(); }
+            try { d = await (await fetch(API + '/resumen')).json(); }
             catch { window.notify('error', 'No se pudo cargar tu información.'); return; }
             if (!d.success) { window.notify('error', d.message); return; }
+            d = d.data;
 
             document.getElementById('grado').textContent = d.grado || '—';
-            document.getElementById('correo_tutor').value = d.correo_tutor || '';
-            document.getElementById('correo_tutor2').value = d.correo_tutor2 || '';
+            document.getElementById('correo_tutor').value = d.correoTutor || '';
+            document.getElementById('correo_tutor2').value = d.correoTutor2 || '';
 
             // Calificaciones
             const fc = document.getElementById('filasCalif');
@@ -90,10 +88,10 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
             d.calificaciones.forEach(c => {
                 const cel = v => `<td>${(v === null || v === '') ? '—' : v}</td>`;
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td><strong>${c.materia}</strong></td>
-                    ${cel(c.p1)}${cel(c.p2)}${cel(c.p3)}
-                    <td><strong>${c.promedio ?? '—'}</strong></td>
-                    <td>${c.reporte || '—'}</td>`;
+                tr.innerHTML = `<td><strong>${c.Materia}</strong></td>
+                    ${cel(c.P1)}${cel(c.P2)}${cel(c.P3)}
+                    <td><strong>${c.Promedio ?? '—'}</strong></td>
+                    <td>${c.Reporte || '—'}</td>`;
                 fc.appendChild(tr);
             });
 
@@ -103,22 +101,22 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
             document.getElementById('vacioPagos').style.display = d.pagos.length ? 'none' : 'block';
             const ESTLBL = { pendiente: 'Pendiente', parcial: 'Pago parcial', pagado: 'Pagado' };
             d.pagos.forEach(p => {
-                const est = (p.estatus || 'pendiente').toLowerCase();
-                const rec = Number(p.recargo_calc) ? `<span style="color:var(--rojo)">${money(p.recargo_calc)}</span>` : '—';
-                const des = Number(p.descuento)
-                    ? `<span style="color:var(--verde)">−${money(p.descuento)}</span>${p.concepto_descuento ? ' <small style="color:var(--texto-suave)">(' + p.concepto_descuento + ')</small>' : ''}`
+                const est = (p.Estatus || 'pendiente').toLowerCase();
+                const rec = Number(p.RecargoCalc) ? `<span style="color:var(--rojo)">${money(p.RecargoCalc)}</span>` : '—';
+                const des = Number(p.Descuento)
+                    ? `<span style="color:var(--verde)">−${money(p.Descuento)}</span>${p.ConceptoDescuento ? ' <small style="color:var(--texto-suave)">(' + p.ConceptoDescuento + ')</small>' : ''}`
                     : '—';
-                const saldoLinea = (est !== 'pagado' && Number(p.abonado) > 0)
-                    ? `<br><small style="color:var(--texto-suave)">Abonado ${money(p.abonado)} · Saldo <strong>${money(p.saldo)}</strong></small>` : '';
-                const reciboLink = p.recibo_id
-                    ? ` <a href="${window.BASE_URL}/recibo?id=${p.recibo_id}" target="_blank" style="color:var(--azul-marca);font-size:.8rem;margin-left:6px;white-space:nowrap;">🧾 recibo</a>` : '';
+                const saldoLinea = (est !== 'pagado' && Number(p.Abonado) > 0)
+                    ? `<br><small style="color:var(--texto-suave)">Abonado ${money(p.Abonado)} · Saldo <strong>${money(p.Saldo)}</strong></small>` : '';
+                const reciboLink = p.IdRecibo
+                    ? ` <a href="${window.BASE_URL}/recibo/imprimir?IdRecibo=${p.IdRecibo}" target="_blank" style="color:var(--azul-marca);font-size:.8rem;margin-left:6px;white-space:nowrap;">🧾 recibo</a>` : '';
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${p.mes ?? ''}</td>
-                    <td>${p.fecha_vencimiento ?? '—'}</td>
-                    <td>${money(p.monto)}</td>
+                tr.innerHTML = `<td>${p.Mes ?? ''}</td>
+                    <td>${p.FechaVencimiento ?? '—'}</td>
+                    <td>${money(p.Monto)}</td>
                     <td>${rec}</td>
                     <td>${des}</td>
-                    <td><strong>${money(p.total)}</strong>${saldoLinea}</td>
+                    <td><strong>${money(p.Total)}</strong>${saldoLinea}</td>
                     <td><span class="badge-estatus ${est}">${ESTLBL[est] || est}</span>${reciboLink}</td>`;
                 fp.appendChild(tr);
             });
@@ -127,10 +125,10 @@ $nombre = $_SESSION['usuario'] ?? 'Alumno';
         document.getElementById('formCorreos').addEventListener('submit', async (e) => {
             e.preventDefault();
             const fd = new FormData();
-            fd.append('correo_tutor', document.getElementById('correo_tutor').value);
-            fd.append('correo_tutor2', document.getElementById('correo_tutor2').value);
+            fd.append('CorreoTutor', document.getElementById('correo_tutor').value);
+            fd.append('CorreoTutor2', document.getElementById('correo_tutor2').value);
             try {
-                const r = await fetch(API + '?action=guardar_correos', { method: 'POST', body: fd });
+                const r = await fetch(API + '/guardarCorreos', { method: 'POST', body: fd });
                 window.notifyResponse(await r.json());
             } catch { window.notify('error', 'No se pudieron guardar los correos.'); }
         });

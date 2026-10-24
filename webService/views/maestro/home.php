@@ -40,12 +40,12 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
     <!-- Tiles -->
     <section class="panel-tiles">
-        <a class="tile" href="<?= $base ?>/maestro/calificaciones">
+        <a class="tile" href="<?= $base ?>/calificacion/index">
             <span class="tile-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg></span>
             <h3>Reportes y calificaciones</h3>
             <p>Registra calificaciones y reportes de tus alumnos.</p>
         </a>
-        <a class="tile" href="<?= $base ?>/maestro/reportes">
+        <a class="tile" href="<?= $base ?>/reporte/index">
             <span class="tile-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
             <h3>Reporte semanal</h3>
             <p>Captura cada clase y envía el reporte a los papás.</p>
@@ -55,11 +55,11 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
     <script>
         async function cerrarSesion() {
             try {
-                const r = await fetch(BASE_URL + '/api/auth?action=logout', { method: 'POST' });
+                const r = await fetch(BASE_URL + '/auth/salir', { method: 'POST' });
                 const data = await r.json();
                 if (data.redirect) { location.href = data.redirect; return; }
             } catch {}
-            location.href = BASE_URL + '/inicio-sesion';
+            location.href = BASE_URL + '/auth/entrar';
         }
     </script>
 </body>

@@ -14,6 +14,6 @@ $permisoActual = (int) ($_SESSION['permiso'] ?? 0);
 $rolRequerido  = (int) ($rol ?? 0);
 
 if (!isset($_SESSION['usuario']) || $permisoActual !== $rolRequerido) {
-    header('Location: ' . BASE_URL . '/inicio-sesion');
+    header('Location: ' . BASE_URL . '/auth/entrar');
     exit;
 }

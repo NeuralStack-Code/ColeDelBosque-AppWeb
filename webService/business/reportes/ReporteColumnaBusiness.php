@@ -1,61 +1,53 @@
 <?php
-
-/** Catálogo de columnas del reporte semanal (tabla reporte_columna). Aquí vive el SQL. */
-class ReporteColumnaBusiness
+/** Entidad ReporteColumna: las columnas del reporte semanal (tabla reporte_columna). Procedures: webService/sql/sp/sp_reporte_columna.sql. */
+class ReporteColumnaBusiness extends Entity
 {
-    private mysqli $db;
+    public ?int    $IdColumna   = null;
+    public string  $Nombre      = '';
+    public string  $Tipo        = 'casilla';
+    public ?string $Etiqueta    = null;
+    public int     $Orden       = 0;
+    public bool    $Activo      = true;
+    public bool    $SoloActivas = false;
 
-    public function __construct(mysqli $db)
+    public function list(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_reporte_columna_listar');
+        $this->db->addParameter('SoloActivas', $this->SoloActivas);
+        return $this->db->execute();
     }
 
-    /** @return ReporteColumna[] */
-    public function listar(bool $soloActivas = false): array
+    /** Regresa el Id nuevo. */
+    public function insert(): array
     {
-        $res = mysqli_query($this->db,
-            'SELECT id_columna, nombre, tipo, etiqueta, orden, activo FROM reporte_columna'
-            . ($soloActivas ? ' WHERE activo = 1' : '')
-            . ' ORDER BY orden, id_columna');
-        $items = [];
-        while ($r = mysqli_fetch_assoc($res)) $items[] = new ReporteColumna($r);
-        return $items;
+        $this->db->command('sp_reporte_columna_crear');
+        $this->fields();
+        return $this->db->execute();
     }
 
-    public function crear(string $nombre, string $tipo, ?string $etiqueta, int $orden, int $activo): bool
+    /** 'notfound' si no existe. */
+    public function update(): array
     {
-        $stmt = mysqli_prepare($this->db, 'INSERT INTO reporte_columna (nombre, tipo, etiqueta, orden, activo) VALUES (?, ?, ?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'sssii', $nombre, $tipo, $etiqueta, $orden, $activo);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_reporte_columna_editar');
+        $this->db->addParameter('IdColumna', $this->IdColumna);
+        $this->fields();
+        return $this->db->execute();
     }
 
-    public function editar(int $id, string $nombre, string $tipo, ?string $etiqueta, int $orden, int $activo): bool
+    /** Regresa las filas afectadas; 'en_uso' si ya hay incidencias con ella. */
+    public function delete(): array
     {
-        $stmt = mysqli_prepare($this->db, 'UPDATE reporte_columna SET nombre = ?, tipo = ?, etiqueta = ?, orden = ?, activo = ? WHERE id_columna = ?');
-        mysqli_stmt_bind_param($stmt, 'sssiii', $nombre, $tipo, $etiqueta, $orden, $activo, $id);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_reporte_columna_eliminar');
+        $this->db->addParameter('IdColumna', $this->IdColumna);
+        return $this->db->execute();
     }
 
-    /** ¿Ya hay incidencias capturadas en esta columna? */
-    public function enUso(int $id): bool
+    private function fields(): void
     {
-        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM reporte_marca WHERE columna_id = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 'i', $id);
-        mysqli_stmt_execute($chk);
-        $hay = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
-        mysqli_stmt_close($chk);
-        return $hay;
-    }
-
-    public function eliminar(int $id): void
-    {
-        $stmt = mysqli_prepare($this->db, 'DELETE FROM reporte_columna WHERE id_columna = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
+        $this->db->addParameter('Nombre',   $this->Nombre);
+        $this->db->addParameter('Tipo',     $this->Tipo);
+        $this->db->addParameter('Etiqueta', $this->Etiqueta);
+        $this->db->addParameter('Orden',    $this->Orden);
+        $this->db->addParameter('Activo',   $this->Activo);
     }
 }

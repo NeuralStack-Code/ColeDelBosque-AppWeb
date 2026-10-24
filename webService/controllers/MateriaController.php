@@ -1,61 +1,71 @@
 <?php
-
 /**
- * Recurso: materias.  Ruta: /api/materias?action=listar|crear|editar|eliminar
- * Catálogo de materias, muchos-a-muchos con grupos (solo admin).
+ * Materias (solo el administrador). Una materia puede impartirse en varios grupos.
+ *   /materia/index     → pantalla del catálogo
+ *   /materia/listar    → las materias con sus grupos
+ *   /materia/guardar   → alta o cambio, con los grupos donde se imparte
+ *   /materia/eliminar  → baja (si no tiene calificaciones)
+ * La URL anterior /administrador/materias redirige a /materia/index (index.php raíz).
  */
-class MateriaController
+class MateriaController extends Controller
 {
-    private MateriaBusiness $materias;
+    protected int $role = self::ADMIN;
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireAdmin();
-        $this->materias = new MateriaBusiness($conexion);
+        $this->view('admin/materias');
     }
 
     public function listar(): void
     {
-        response(200, true, 'Materias obtenidas.', ['items' => $this->materias->listar()]);
-    }
+        $this->api->command('Materias', 'Materia', 'List');
+        $result = $this->api->execute();
 
-    public function crear(): void
-    {
-        $nombre = trim($_POST['nombre'] ?? '');
-        $grupos = json_decode($_POST['grupos'] ?? '[]', true) ?: [];
-        if ($nombre === '') response(400, false, 'El nombre es obligatorio.');
-        if ($this->materias->nombreDuplicado($nombre)) response(409, false, 'Ya existe una materia con ese nombre.');
-
-        $id = $this->materias->crear($nombre);
-        if ($id <= 0) response(500, false, 'No se pudo crear la materia.');
-
-        $this->materias->sincronizarGrupos($id, $grupos);
-        response(201, true, 'Materia creada.');
-    }
-
-    public function editar(): void
-    {
-        $id     = (int) ($_POST['id_materia'] ?? 0);
-        $nombre = trim($_POST['nombre'] ?? '');
-        $grupos = json_decode($_POST['grupos'] ?? '[]', true) ?: [];
-        if ($id <= 0)       response(400, false, 'Registro no válido.');
-        if ($nombre === '') response(400, false, 'El nombre es obligatorio.');
-        if ($this->materias->nombreDuplicado($nombre, $id)) response(409, false, 'Ya existe otra materia con ese nombre.');
-
-        if (!$this->materias->editar($id, $nombre)) response(500, false, 'No se pudo actualizar la materia.');
-
-        $this->materias->sincronizarGrupos($id, $grupos);
-        response(200, true, 'Materia actualizada.');
-    }
-
-    public function eliminar(): void
-    {
-        $id = (int) ($_POST['id_materia'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        if ($this->materias->tieneCalificaciones($id)) {
-            response(409, false, 'No se puede eliminar: la materia tiene calificaciones registradas.');
+        if (!$result->status()) {
+            $this->success('Materias obtenidas.', ['items' => Materia::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
         }
-        $this->materias->eliminar($id);
-        response(200, true, 'Materia eliminada.');
+    }
+
+    /** Sin IdMateria es un alta; con ella, un cambio. $Grupos son los ids de los grupos marcados en el formulario. */
+    public function guardar(Materia $materia, array $Grupos = []): void
+    {
+        $this->ensure($materia->Nombre !== '', 'El nombre es obligatorio.');
+        $this->ensure((bool) preg_match('/^.{1,25}$/us', $materia->Nombre), 'El nombre admite máximo 25 caracteres.');
+
+        // Solo ids de grupo válidos y sin repetir; al business viajan como "69,70,71".
+        $ids = array_values(array_unique(array_filter(array_map('intval', $Grupos), fn(int $id) => $id > 0)));
+
+        if (!$materia->IdMateria) {
+            $this->api->command('Materias', 'Materia', 'Insert');
+        } else {
+            $this->api->command('Materias', 'Materia', 'Update');
+            $this->api->addParameter('IdMateria', 'I', $materia->IdMateria);
+        }
+        $this->api->addParameter('Nombre', 'S', $materia->Nombre);
+        $this->api->addParameter('Grupos', 'S', implode(',', $ids));
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$materia->IdMateria) $this->success('Materia creada.', ['IdMateria' => $result->id()], 201);
+            $this->success('Materia actualizada.');
+        } else {
+            $this->failure($result);
+        }
+    }
+
+    public function eliminar(int $IdMateria): void
+    {
+        $this->api->command('Materias', 'Materia', 'Delete');
+        $this->api->addParameter('IdMateria', 'I', $IdMateria);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->ensure($result->affected() > 0, 'No se encontró la materia.', 404);
+            $this->success('Materia eliminada.');
+        } else {
+            $this->failure($result);
+        }
     }
 }

@@ -33,61 +33,73 @@ if ($route === false) $route = '';
 $routes = [
     ''                  => __DIR__ . '/webService/views/home.php',
     'index.php'         => __DIR__ . '/webService/views/home.php',
-    'contacto'          => __DIR__ . '/webService/views/site/contacto.php',
     'oferta-educativa'  => __DIR__ . '/webService/views/site/oferta_educativa.php',
     'actividades'       => __DIR__ . '/webService/views/site/actividades.php',
-    'inicio-sesion'     => __DIR__ . '/webService/views/site/inicio_sesion.php',
 
     //Maestro (permiso_id = 2)
     'maestro'                 => __DIR__ . '/webService/views/maestro/home.php',
-    'maestro/calificaciones'  => __DIR__ . '/webService/views/maestro/calificaciones.php',
-    'maestro/reportes'        => __DIR__ . '/webService/views/maestro/reportes.php',
 
-    //Padre / alumno (permiso_id = 3)
-    'padre'            => __DIR__ . '/webService/views/padre/home.php',
-
-    //Compartida (admin + padre): recibo imprimible
-    'recibo'           => __DIR__ . '/webService/views/recibo.php',
-
-    //Admin (permiso_id = 1)
-    'administrador'               => __DIR__ . '/webService/views/admin/home.php',
-    'administrador/alumnos'       => __DIR__ . '/webService/views/admin/alumnos.php',
-    'administrador/maestros'      => __DIR__ . '/webService/views/admin/maestros.php',
-    'administrador/grupos'        => __DIR__ . '/webService/views/admin/grupos.php',
-    'administrador/colegiaturas'  => __DIR__ . '/webService/views/admin/colegiaturas.php',
-    'administrador/recibos'       => __DIR__ . '/webService/views/admin/recibos.php',
-    'administrador/tipos-recibo'  => __DIR__ . '/webService/views/admin/tipos_recibo.php',
-    'administrador/tipos-descuento' => __DIR__ . '/webService/views/admin/tipos_descuento.php',
-    'administrador/materias'      => __DIR__ . '/webService/views/admin/materias.php',
-    'administrador/ciclos'        => __DIR__ . '/webService/views/admin/ciclos.php',
-    'administrador/esquemas-pago' => __DIR__ . '/webService/views/admin/esquemas_pago.php',
-    'administrador/reporte-columnas' => __DIR__ . '/webService/views/admin/reporte_columnas.php',
 
     //Desarrollador (permiso_id = 4)
     'desarrollador'            => __DIR__ . '/webService/views/dev/home.php',
-    'desarrollador/perfiles'   => __DIR__ . '/webService/views/dev/perfiles.php',
-    'desarrollador/permisos'   => __DIR__ . '/webService/views/dev/permisos.php',
-    'desarrollador/tablas'     => __DIR__ . '/webService/views/dev/tablas.php',
 ];
 
+// Pantallas que ya son /<controller>/<método>. Las URLs anteriores redirigen (301) conservando el query string.
+$moved = [
+    'inicio-sesion'        => '/auth/entrar',
+    'administrador/ciclos' => '/ciclo/index',
+    'administrador'                 => '/dashboard/index',
+    'administrador/tipos-recibo'    => '/tiporecibo/index',
+    'administrador/tipos-descuento' => '/tipodescuento/index',
+    'desarrollador/permisos'        => '/permiso/index',
+    'desarrollador/tablas'          => '/tablas/index',
+    'administrador/materias'        => '/materia/index',
+    'desarrollador/perfiles'        => '/perfil/index',
+    'padre'                         => '/padre/index',
+    'administrador/colegiaturas'    => '/colegiatura/index',
+    'administrador/esquemas-pago'   => '/esquemapago/index',
+    'administrador/recibos'         => '/recibo/index',
+    'recibo'                        => '/recibo/imprimir',
+    'administrador/reporte-columnas' => '/reportecolumna/index',
+    'maestro/calificaciones'        => '/calificacion/index',
+    'maestro/reportes'              => '/reporte/index',
+    'administrador/alumnos'         => '/alumno/index',
+    'administrador/maestros'        => '/docente/index',
+    'administrador/grupos'          => '/grupo/index',
+];
+if (isset($moved[$route])) {
+    $query = $_SERVER['QUERY_STRING'] ?? '';
+    header('Location: ' . BASE_URL . $moved[$route] . ($query !== '' ? '?' . $query : ''), true, 301);
+    exit;
+}
+
+// Los candados de abajo son de las páginas sueltas de $routes. Las pantallas que ya son de un controller
+// revisan el rol ellas mismas (Controller::authorize), y sus métodos los usa el panel de cada rol.
+$isPage = array_key_exists($route, $routes);
+
 // Admin encerrado en su panel: solo puede navegar rutas 'administrador' y 'administrador/*' (+ recibo)
-if (isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 1) {
+if ($isPage && isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 1) {
     if ($route !== 'administrador' && strpos($route, 'administrador/') !== 0 && $route !== 'recibo') {
-        header('Location: ' . BASE_URL . '/administrador');
+        header('Location: ' . BASE_URL . '/dashboard/index');
         exit;
     }
 }
 
 // Desarrollador encerrado en su panel: solo 'desarrollador' y 'desarrollador/*'
-if (isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 4) {
+if ($isPage && isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 4) {
     if ($route !== 'desarrollador' && strpos($route, 'desarrollador/') !== 0) {
         header('Location: ' . BASE_URL . '/desarrollador');
         exit;
     }
 }
 
-if (array_key_exists($route, $routes)) {
+// 1) Páginas sueltas de $routes.  2) /<controller>/<método> (controllers que heredan de Controller;
+//    lo despacha el router de apiService).  3) 404.
+if ($isPage) {
     require $routes[$route];
+} elseif (($class = routeController(explode('/', $route)[0])) !== null
+          && method_exists($class, explode('/', $route, 2)[1] ?? 'index')) {
+    require __DIR__ . '/apiService/index.php';
 } else {
     http_response_code(404);
     require __DIR__ . '/webService/views/404.php';

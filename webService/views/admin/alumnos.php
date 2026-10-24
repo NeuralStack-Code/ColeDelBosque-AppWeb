@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de alumnos. La pinta AlumnoController::index(). Recibe $base. Su JavaScript llama a /alumno/<método> (y a /grupo/listar). */
 $title = 'Alumnos | Admin';
 $extraCss = ['admin.css'];
 $extraJs = ['matricula.js'];
@@ -15,7 +13,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -23,7 +21,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -77,7 +75,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/control-escolar';
+        const API = window.BASE_URL + '/alumno';
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
@@ -86,25 +84,25 @@ $img = $base . '/webService/wwwroot/img';
         let todos = [];
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargarGrupos() {
-            const d = await (await fetch(API + '?action=grupos_listar')).json();
-            grupos = d.items || [];
-            const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
+            const d = await (await fetch(window.BASE_URL + '/grupo/listar')).json();
+            grupos = d.data?.items || [];
+            const opts = grupos.map(g => `<option value="${g.IdGrupo}">${g.Grado}</option>`).join('');
             document.getElementById('grado').innerHTML = opts || '<option value="">Sin grupos</option>';
             document.getElementById('fGrupo').innerHTML =
                 '<option value="">Todos</option><option value="__sin__">⚠ Sin grupo</option>' + opts;
         }
 
         // ids de grupos válidos (para detectar alumnos sin grupo)
-        const idsValidos = () => new Set(grupos.map(g => Number(g.id_grupo)));
+        const idsValidos = () => new Set(grupos.map(g => Number(g.IdGrupo)));
 
         async function cargarAlumnos() {
-            const d = await (await fetch(API + '?action=alumnos_listar')).json();
-            todos = d.items || [];
+            const d = await (await fetch(API + '/listar')).json();
+            todos = d.data?.items || [];
             render();
         }
 
@@ -113,12 +111,12 @@ $img = $base . '/webService/wwwroot/img';
             const nom = document.getElementById('fNom').value.toLowerCase();
             const grp = document.getElementById('fGrupo').value;
             const validos = idsValidos();
-            const esHuerfano = a => !validos.has(Number(a.grupo_id));
+            const esHuerfano = a => !validos.has(Number(a.IdGrupo));
             const f = todos.filter(a => {
-                if (mat && !(a.matricula || '').toLowerCase().includes(mat)) return false;
-                if (nom && !`${a.nombre} ${a.paterno} ${a.materno ?? ''}`.toLowerCase().includes(nom)) return false;
+                if (mat && !(a.Matricula || '').toLowerCase().includes(mat)) return false;
+                if (nom && !`${a.Nombre} ${a.Paterno} ${a.Materno ?? ''}`.toLowerCase().includes(nom)) return false;
                 if (grp === '__sin__') { if (!esHuerfano(a)) return false; }
-                else if (grp && String(a.grupo_id) !== grp) return false;
+                else if (grp && String(a.IdGrupo) !== grp) return false;
                 return true;
             });
             filas.innerHTML = '';
@@ -126,14 +124,14 @@ $img = $base . '/webService/wwwroot/img';
             f.forEach(a => {
                 const celdaGrupo = esHuerfano(a)
                     ? '<span class="pill-sin">Sin grupo</span>'
-                    : (a.grado ?? '—');
+                    : (a.Grado ?? '—');
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${a.matricula ?? ''}</td>
-                    <td>${a.nombre} ${a.paterno} ${a.materno ?? ''}</td>
+                    <td>${a.Matricula ?? ''}</td>
+                    <td>${a.Nombre} ${a.Paterno} ${a.Materno ?? ''}</td>
                     <td>${celdaGrupo}</td>
                     <td><div class="acciones">
-                        <button class="icon-btn correo" title="${a.correo_tutor || a.correo_tutor2 ? 'Enviar matrícula por correo' : 'Sin correo de tutor'}" ${a.correo_tutor || a.correo_tutor2 ? '' : 'disabled'}><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></button>
+                        <button class="icon-btn correo" title="${a.CorreoTutor || a.CorreoTutor2 ? 'Enviar matrícula por correo' : 'Sin correo de tutor'}" ${a.CorreoTutor || a.CorreoTutor2 ? '' : 'disabled'}><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></button>
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
                     </div></td>`;
@@ -158,16 +156,16 @@ $img = $base . '/webService/wwwroot/img';
         }
         function abrirEdicion(a) {
             document.getElementById('modalTitulo').textContent = 'Editar alumno';
-            document.getElementById('id_cuenta').value = a.id_cuenta;
-            document.getElementById('nombre').value = a.nombre;
-            document.getElementById('paterno').value = a.paterno;
-            document.getElementById('materno').value = a.materno ?? '';
-            document.getElementById('matricula').value = a.matricula ?? '';
+            document.getElementById('id_cuenta').value = a.IdCuenta;
+            document.getElementById('nombre').value = a.Nombre;
+            document.getElementById('paterno').value = a.Paterno;
+            document.getElementById('materno').value = a.Materno ?? '';
+            document.getElementById('matricula').value = a.Matricula ?? '';
             mat.desactivar();   // al editar no se regenera: cambiarla le cambia el acceso a la familia
             document.getElementById('matAyuda').textContent = 'Es la clave de acceso de la familia; si la cambias, avísales.';
-            document.getElementById('grado').value = a.grupo_id ?? '';
-            document.getElementById('correo_tutor').value = a.correo_tutor ?? '';
-            document.getElementById('correo_tutor2').value = a.correo_tutor2 ?? '';
+            document.getElementById('grado').value = a.IdGrupo ?? '';
+            document.getElementById('correo_tutor').value = a.CorreoTutor ?? '';
+            document.getElementById('correo_tutor2').value = a.CorreoTutor2 ?? '';
             modal.showModal();
         }
 
@@ -175,32 +173,32 @@ $img = $base . '/webService/wwwroot/img';
             e.preventDefault();
             const id = document.getElementById('id_cuenta').value;
             const fd = new FormData();
-            fd.append('nombre', nombre.value);
-            fd.append('paterno', paterno.value);
-            fd.append('materno', materno.value);
-            fd.append('matricula', matricula.value);
-            fd.append('grado', grado.value);
-            fd.append('correo_tutor', correo_tutor.value);
-            fd.append('correo_tutor2', correo_tutor2.value);
-            let accion = 'alumno_crear';
-            if (id) { accion = 'alumno_editar'; fd.append('id_cuenta', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
+            // Cada campo viaja con el nombre de la propiedad del model Persona
+            fd.append('Nombre', nombre.value);
+            fd.append('Paterno', paterno.value);
+            fd.append('Materno', materno.value);
+            fd.append('Matricula', matricula.value);
+            fd.append('IdGrupo', grado.value);
+            fd.append('CorreoTutor', correo_tutor.value);
+            fd.append('CorreoTutor2', correo_tutor2.value);
+            if (id) fd.append('IdCuenta', id);
+            const d = await (await fetch(API + '/guardar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) { modal.close(); cargarAlumnos(); }
         });
 
         async function enviarMatricula(a) {
-            if (!await window.confirmar(`Se enviará la matrícula de ${a.nombre} ${a.paterno} al correo de su tutor.`,
+            if (!await window.confirmar(`Se enviará la matrícula de ${a.Nombre} ${a.Paterno} al correo de su tutor.`,
                 { titulo: '¿Enviar matrícula?', confirmar: 'Enviar', peligro: false })) return;
-            const fd = new FormData(); fd.append('id_cuenta', a.id_cuenta);
-            const d = await (await fetch(API + '?action=alumno_enviar_matricula', { method: 'POST', body: fd })).json();
+            const fd = new FormData(); fd.append('IdCuenta', a.IdCuenta);
+            const d = await (await fetch(API + '/enviarMatricula', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
         }
 
         async function eliminar(a) {
-            if (!await window.confirmar(`¿Eliminar a ${a.nombre} ${a.paterno}? Se borrarán también sus colegiaturas, calificaciones y recibos. Esta acción no se puede deshacer.`)) return;
-            const fd = new FormData(); fd.append('id_cuenta', a.id_cuenta);
-            const d = await (await fetch(API + '?action=alumno_eliminar', { method: 'POST', body: fd })).json();
+            if (!await window.confirmar(`¿Eliminar a ${a.Nombre} ${a.Paterno}? Se borrarán también sus colegiaturas, calificaciones y recibos. Esta acción no se puede deshacer.`)) return;
+            const fd = new FormData(); fd.append('IdCuenta', a.IdCuenta);
+            const d = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargarAlumnos();
         }

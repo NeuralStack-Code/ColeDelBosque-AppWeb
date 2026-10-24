@@ -1,61 +1,38 @@
 <?php
-
-/** Catálogo de roles (tabla permisos). Aquí vive el SQL. */
-class PermisoBusiness
+/** Entidad Permiso: catálogo de roles (tabla permisos). Procedures: webService/sql/sp/sp_catalogos.sql. */
+class PermisoBusiness extends Entity
 {
-    private mysqli $db;
+    public ?int   $IdPermiso = null;
+    public string $Nombre    = '';
 
-    public function __construct(mysqli $db)
+    /** Cada rol con cuántas cuentas lo tienen. */
+    public function list(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_permiso_listar');
+        return $this->db->execute();
     }
 
-    /** @return Permiso[] */
-    public function listar(): array
+    public function insert(): array
     {
-        $res = mysqli_query($this->db,
-            'SELECT p.id_permiso, p.nombre,
-                    (SELECT COUNT(*) FROM cuenta c WHERE c.permiso_id = p.id_permiso) AS num_cuentas
-             FROM permisos p ORDER BY p.id_permiso');
-        $items = [];
-        while ($r = mysqli_fetch_assoc($res)) $items[] = new Permiso($r);
-        return $items;
+        $this->db->command('sp_permiso_crear');
+        $this->db->addParameter('Nombre', $this->Nombre);
+        return $this->db->execute();
     }
 
-    public function crear(string $nombre): bool
+    /** 'notfound' si no existe. */
+    public function update(): array
     {
-        $stmt = mysqli_prepare($this->db, 'INSERT INTO permisos (nombre) VALUES (?)');
-        mysqli_stmt_bind_param($stmt, 's', $nombre);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_permiso_editar');
+        $this->db->addParameter('IdPermiso', $this->IdPermiso);
+        $this->db->addParameter('Nombre',    $this->Nombre);
+        return $this->db->execute();
     }
 
-    public function editar(int $id, string $nombre): bool
+    /** Regresa las filas afectadas; 'en_uso' si hay cuentas con ese rol. */
+    public function delete(): array
     {
-        $stmt = mysqli_prepare($this->db, 'UPDATE permisos SET nombre = ? WHERE id_permiso = ?');
-        mysqli_stmt_bind_param($stmt, 'si', $nombre, $id);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
-    }
-
-    /** ¿Hay cuentas usando este rol? */
-    public function tieneCuentas(int $id): bool
-    {
-        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM cuenta WHERE permiso_id = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 'i', $id);
-        mysqli_stmt_execute($chk);
-        $hay = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
-        mysqli_stmt_close($chk);
-        return $hay;
-    }
-
-    public function eliminar(int $id): void
-    {
-        $stmt = mysqli_prepare($this->db, 'DELETE FROM permisos WHERE id_permiso = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
+        $this->db->command('sp_permiso_eliminar');
+        $this->db->addParameter('IdPermiso', $this->IdPermiso);
+        return $this->db->execute();
     }
 }

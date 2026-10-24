@@ -16,3 +16,6 @@ _prev_*.html
 _dev*.php
 /*.sql
 /storage/*.log
+
+# Copias que deja el actualizador del framework (php apiService/core/update.php)
+/storage/framework-backup/

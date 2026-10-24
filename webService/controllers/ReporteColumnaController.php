@@ -1,64 +1,74 @@
 <?php
-
 /**
- * Recurso: reporte-columnas.  Ruta: /api/reporte-columnas?action=listar|crear|editar|eliminar
- * Columnas que las maestras capturan en el reporte semanal (solo admin).
+ * Columnas del reporte semanal que capturan las maestras (solo el administrador).
+ *   /reportecolumna/index     → pantalla
+ *   /reportecolumna/listar    → todas las columnas, en su orden
+ *   /reportecolumna/guardar   → alta o cambio
+ *   /reportecolumna/eliminar  → baja (si aún no hay reportes con ella; si los hay, se desactiva)
+ * La URL anterior /administrador/reporte-columnas redirige a /reportecolumna/index (index.php raíz).
  */
-class ReporteColumnaController
+class ReporteColumnaController extends Controller
 {
-    private ReporteColumnaBusiness $cols;
+    protected int $role = self::ADMIN;
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireAdmin();
-        $this->cols = new ReporteColumnaBusiness($conexion);
-    }
-
-    /** Lee y valida el formulario → [nombre, tipo, etiqueta, orden, activo]. */
-    private function datos(): array
-    {
-        $nombre   = trim($_POST['nombre'] ?? '');
-        $tipo     = ($_POST['tipo'] ?? '') === 'texto' ? 'texto' : 'casilla';
-        $etiqueta = trim($_POST['etiqueta'] ?? '');
-        $orden    = (int) ($_POST['orden'] ?? 0);
-        $activo   = ($_POST['activo'] ?? '1') === '0' ? 0 : 1;
-
-        if ($nombre === '')              response(400, false, 'El nombre es obligatorio.');
-        if (iconv_strlen($nombre) > 60)     response(400, false, 'El nombre no puede pasar de 60 caracteres.');
-        if (iconv_strlen($etiqueta) > 60)   response(400, false, 'El texto del correo no puede pasar de 60 caracteres.');
-        // La etiqueta solo aplica a casillas (es lo que lee el papá cuando está marcada)
-        $etiqueta = ($tipo === 'casilla' && $etiqueta !== '') ? $etiqueta : null;
-
-        return [$nombre, $tipo, $etiqueta, $orden, $activo];
+        $this->view('admin/reporte_columnas');
     }
 
     public function listar(): void
     {
-        response(200, true, 'Columnas obtenidas.', ['items' => $this->cols->listar()]);
+        $this->api->command('Reportes', 'ReporteColumna', 'List');
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Columnas obtenidas.', ['items' => ReporteColumna::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function crear(): void
+    /** Sin IdColumna es un alta; con ella, un cambio. La etiqueta solo aplica a las casillas. */
+    public function guardar(ReporteColumna $columna): void
     {
-        [$nombre, $tipo, $etiqueta, $orden, $activo] = $this->datos();
-        if (!$this->cols->crear($nombre, $tipo, $etiqueta, $orden, $activo)) response(500, false, 'No se pudo crear la columna.');
-        response(201, true, 'Columna creada.');
+        $tipo     = $columna->Tipo === 'texto' ? 'texto' : 'casilla';
+        $etiqueta = (string) $columna->Etiqueta;
+        $this->ensure($columna->Nombre !== '', 'El nombre es obligatorio.');
+        $this->ensure((bool) preg_match('/^.{1,60}$/us', $columna->Nombre), 'El nombre no puede pasar de 60 caracteres.');
+        $this->ensure((bool) preg_match('/^.{0,60}$/us', $etiqueta), 'El texto del correo no puede pasar de 60 caracteres.');
+
+        if (!$columna->IdColumna) {
+            $this->api->command('Reportes', 'ReporteColumna', 'Insert');
+        } else {
+            $this->api->command('Reportes', 'ReporteColumna', 'Update');
+            $this->api->addParameter('IdColumna', 'I', $columna->IdColumna);
+        }
+        $this->api->addParameter('Nombre',   'S', $columna->Nombre);
+        $this->api->addParameter('Tipo',     'S', $tipo);
+        $this->api->addParameter('Etiqueta', 'S', $tipo === 'casilla' && $etiqueta !== '' ? $etiqueta : null);
+        $this->api->addParameter('Orden',    'I', $columna->Orden);
+        $this->api->addParameter('Activo',   'B', $columna->Activo);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$columna->IdColumna) $this->success('Columna creada.', ['IdColumna' => $result->id()], 201);
+            $this->success('Columna actualizada.');
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function editar(): void
+    public function eliminar(int $IdColumna): void
     {
-        $id = (int) ($_POST['id_columna'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        [$nombre, $tipo, $etiqueta, $orden, $activo] = $this->datos();
-        if (!$this->cols->editar($id, $nombre, $tipo, $etiqueta, $orden, $activo)) response(500, false, 'No se pudo actualizar la columna.');
-        response(200, true, 'Columna actualizada.');
-    }
+        $this->api->command('Reportes', 'ReporteColumna', 'Delete');
+        $this->api->addParameter('IdColumna', 'I', $IdColumna);
+        $result = $this->api->execute();
 
-    public function eliminar(): void
-    {
-        $id = (int) ($_POST['id_columna'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        if ($this->cols->enUso($id)) response(409, false, 'No se puede eliminar: ya hay reportes capturados con esta columna. Desactívala para ocultarla.');
-        $this->cols->eliminar($id);
-        response(200, true, 'Columna eliminada.');
+        if (!$result->status()) {
+            $this->ensure($result->affected() > 0, 'No se encontró la columna.', 404);
+            $this->success('Columna eliminada.');
+        } else {
+            $this->failure($result);
+        }
     }
 }

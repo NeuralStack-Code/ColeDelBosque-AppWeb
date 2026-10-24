@@ -1,55 +1,31 @@
 <?php
-require_once dirname(__DIR__, 3) . '/apiService/core/crypto.php';
-
-/**
- * Visor de solo lectura de las tablas de la BD. El nombre de tabla se valida
- * contra la lista real (whitelist) en el controller para evitar inyección.
- */
-class TablasBusiness
+/** Entidad Tablas: visor de solo lectura de la base (solo el desarrollador). Procedures: webService/sql/sp/sp_dashboard.sql. */
+class TablasBusiness extends Entity
 {
-    private mysqli $db;
+    public string $Tabla  = '';
+    public int    $Limite = 200;
 
-    public function __construct(mysqli $db)
+    /** Cada tabla con su número de filas. */
+    public function list(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_tablas_listar');
+        return $this->db->execute();
     }
 
-    /** Lista real de tablas de la BD (whitelist). @return string[] */
-    public function tablas(): array
+    /** Los nombres de las columnas de la tabla, en su orden; sin filas = la tabla no existe. */
+    public function columns(): array
     {
-        $t = [];
-        $res = mysqli_query($this->db, 'SHOW TABLES');
-        while ($r = mysqli_fetch_row($res)) $t[] = $r[0];
-        return $t;
+        $this->db->command('sp_tablas_columnas');
+        $this->db->addParameter('Tabla', $this->Tabla);
+        return $this->db->execute();
     }
 
-    /** Cada tabla con su conteo de filas. @return array[] {tabla, filas} */
-    public function listarConConteo(): array
+    /** Las primeras filas de la tabla, tal como están en la base. 'notfound' si la tabla no existe. */
+    public function rows(): array
     {
-        $items = [];
-        foreach ($this->tablas() as $t) {
-            $c = mysqli_fetch_row(mysqli_query($this->db, 'SELECT COUNT(*) FROM `' . $t . '`'))[0] ?? 0;
-            $items[] = ['tabla' => $t, 'filas' => (int) $c];
-        }
-        return $items;
-    }
-
-    /** Lee una tabla (nombre YA validado contra la whitelist). Desencripta matrícula. */
-    public function ver(string $tabla, int $limite): array
-    {
-        $res = mysqli_query($this->db, 'SELECT * FROM `' . $tabla . '` LIMIT ' . $limite);
-        $columnas = [];
-        foreach (mysqli_fetch_fields($res) as $f) $columnas[] = $f->name;
-        $desencriptar = in_array('matricula', $columnas, true);
-
-        $filas = [];
-        while ($r = mysqli_fetch_assoc($res)) {
-            if ($desencriptar && !empty($r['matricula'])) {
-                $dec = decrypt($r['matricula']);
-                if ($dec !== '' && $dec !== null) $r['matricula'] = $dec;
-            }
-            $filas[] = $r;
-        }
-        return ['columnas' => $columnas, 'filas' => $filas];
+        $this->db->command('sp_tablas_ver');
+        $this->db->addParameter('Tabla',  $this->Tabla);
+        $this->db->addParameter('Limite', $this->Limite);
+        return $this->db->execute();
     }
 }

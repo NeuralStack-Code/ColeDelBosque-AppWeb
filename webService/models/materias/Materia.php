@@ -1,20 +1,20 @@
 <?php
 /**
- * Entidad Materia (con los grupos vinculados, tal como los lee el listado).
- * Solo variables. `grupo_ids` es un arreglo de ids de grupo (muchos-a-muchos).
+ * Model Materia, con los grupos donde se imparte (una materia puede estar en varios).
+ * Lo carga Materia::fromTable() desde sp_materia_listar y Materia::fromForm() desde su formulario.
  */
-class Materia
+class Materia extends Model
 {
-    public ?int    $id_materia = null;
-    public ?string $nombre     = null;
-    public ?string $grupos_txt = null;
-    public array   $grupo_ids  = [];
-    public ?int    $num_grupos = null;
+    public ?int    $IdMateria = null;
+    public string  $Nombre    = '';
+    public ?string $GruposTxt = null;   // "Primero, Segundo": los grados, para mostrar
+    public array   $GrupoIds  = [];     // ids de sus grupos
+    public int     $NumGrupos = 0;
 
-    public function __construct(array $fila = [])
+    /** El procedure trae los ids de los grupos como texto ("69,70"): aquí quedan como lista de enteros. */
+    protected function onLoad(array $row): void
     {
-        foreach ($fila as $col => $val) {
-            if (property_exists($this, $col)) $this->$col = $val;
-        }
+        $csv = (string) ($row['GruposCsv'] ?? '');
+        $this->GrupoIds = $csv === '' ? [] : array_map('intval', explode(',', $csv));
     }
 }

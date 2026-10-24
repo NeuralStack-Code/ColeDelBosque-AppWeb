@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de tipos de descuento. La pinta TipoDescuentoController::index(). Recibe $base. Su JavaScript llama a /tipodescuento/<método>. */
 $title = 'Tipos de descuento | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador/colegiaturas">
+    <a class="volver-panel" href="<?= $base ?>/colegiatura/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Volver a colegiaturas
     </a>
@@ -48,19 +46,19 @@ $img = $base . '/webService/wwwroot/img';
         <div class="modal-in">
             <h3 id="modalTitulo">Nuevo descuento</h3>
             <form id="form">
-                <input type="hidden" id="id_descuento">
-                <div class="campo"><label>Nombre</label><input type="text" id="nombre" placeholder="Ej. Buen Fin, Pronto pago" required></div>
+                <input type="hidden" name="IdDescuento">
+                <div class="campo"><label>Nombre</label><input type="text" name="Nombre" maxlength="80" placeholder="Ej. Buen Fin, Pronto pago" required></div>
                 <div class="fila-2">
-                    <div class="campo"><label>Porcentaje (%)</label><input type="number" id="porcentaje" min="0" max="100" step="0.01" required></div>
+                    <div class="campo"><label>Porcentaje (%)</label><input type="number" name="Porcentaje" min="0" max="100" step="0.01" required></div>
                     <div class="campo"><label>Aplica a</label>
-                        <select id="aplica_a">
+                        <select name="AplicaA">
                             <option value="colegiatura">Colegiatura</option>
                             <option value="inscripcion">Inscripción</option>
                         </select>
                     </div>
                 </div>
                 <div class="campo" id="campoActivo" style="display:none;"><label>Estado</label>
-                    <select id="activo"><option value="1">Activo</option><option value="0">Inactivo</option></select>
+                    <select name="Activo"><option value="1">Activo</option><option value="0">Inactivo</option></select>
                 </div>
                 <div class="modal-acciones">
                     <button type="button" class="btn btn-fantasma" onclick="modal.close()">Cancelar</button>
@@ -71,7 +69,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/tipos-descuento';
+        const API = window.BASE_URL + '/tipodescuento';   // cada método del controller es una URL: /tipodescuento/listar…
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
@@ -79,23 +77,23 @@ $img = $base . '/webService/wwwroot/img';
         const pct = n => Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 2 }) + '%';
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            const items = d.items || [];
+            const result = await (await fetch(API + '/listar')).json();
+            const items = result.data.items || [];
             filas.innerHTML = '';
             vacio.style.display = items.length ? 'none' : 'block';
             items.forEach(t => {
-                const inactivo = Number(t.activo) === 0;
+                const inactivo = !t.Activo;
                 const tr = document.createElement('tr');
                 if (inactivo) tr.style.opacity = '.55';
                 tr.innerHTML = `
-                    <td><strong>${t.nombre}</strong></td>
-                    <td><span class="badge-estatus ${t.aplica_a === 'inscripcion' ? 'pendiente' : 'pagado'}">${t.aplica_a}</span></td>
-                    <td><strong>${pct(t.porcentaje)}</strong></td>
+                    <td><strong>${t.Nombre}</strong></td>
+                    <td><span class="badge-estatus ${t.AplicaA === 'inscripcion' ? 'pendiente' : 'pagado'}">${t.AplicaA}</span></td>
+                    <td><strong>${pct(t.Porcentaje)}</strong></td>
                     <td>${inactivo ? '<span class="pill-sin">Inactivo</span>' : '<span class="badge-estatus pagado">activo</span>'}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -110,45 +108,35 @@ $img = $base . '/webService/wwwroot/img';
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nuevo descuento';
             form.reset();
-            document.getElementById('id_descuento').value = '';
+            form.elements.IdDescuento.value = '';
+            form.elements.Activo.value = '1';                              // un descuento nace activo
             document.getElementById('campoActivo').style.display = 'none';
             modal.showModal();
         }
+
         function abrirEdicion(t) {
             document.getElementById('modalTitulo').textContent = 'Editar descuento';
-            document.getElementById('id_descuento').value = t.id_descuento;
-            document.getElementById('nombre').value = t.nombre;
-            document.getElementById('porcentaje').value = t.porcentaje;
-            document.getElementById('aplica_a').value = t.aplica_a;
-            document.getElementById('activo').value = String(t.activo);
+            // Los campos del formulario se llaman como las propiedades del descuento.
+            for (const campo of ['IdDescuento', 'Nombre', 'Porcentaje', 'AplicaA']) form.elements[campo].value = t[campo];
+            form.elements.Activo.value = t.Activo ? '1' : '0';
             document.getElementById('campoActivo').style.display = 'block';
             modal.showModal();
         }
 
+        // Guardar: con IdDescuento es un cambio; sin él, un alta.
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const id = document.getElementById('id_descuento').value;
-            const fd = new FormData();
-            fd.append('nombre', document.getElementById('nombre').value);
-            fd.append('porcentaje', document.getElementById('porcentaje').value);
-            fd.append('aplica_a', document.getElementById('aplica_a').value);
-            let accion = 'crear';
-            if (id) {
-                accion = 'editar';
-                fd.append('id_descuento', id);
-                fd.append('activo', document.getElementById('activo').value);
-            }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { modal.close(); cargar(); }
+            const result = await (await fetch(API + '/guardar', { method: 'POST', body: new FormData(form) })).json();
+            window.notifyResponse(result);
+            if (result.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(t) {
-            if (!await window.confirmar(`¿Eliminar el descuento "${t.nombre}"?`)) return;
-            const fd = new FormData(); fd.append('id_descuento', t.id_descuento);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) cargar();
+            if (!await window.confirmar(`¿Eliminar el descuento "${t.Nombre}"?`)) return;
+            const fd = new FormData(); fd.append('IdDescuento', t.IdDescuento);
+            const result = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
+            window.notifyResponse(result);
+            if (result.success) cargar();
         }
 
         cargar();

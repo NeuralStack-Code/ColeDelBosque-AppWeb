@@ -1,61 +1,73 @@
 <?php
-
 /**
- * Recurso: tipos-descuento.  Ruta: /api/tipos-descuento?action=listar|crear|editar|eliminar
- * Catálogo de tipos de descuento (solo admin). El % vive en la BD, nada hardcodeado.
+ * Tipos de descuento (solo el administrador). El porcentaje vive en la base, nada va fijo en el código.
+ *   /tipodescuento/index     → pantalla del catálogo
+ *   /tipodescuento/listar    → los descuentos
+ *   /tipodescuento/guardar   → alta (nace activo) o cambio (también lo activa o desactiva)
+ *   /tipodescuento/eliminar  → baja (si no hay pagos con ese descuento)
+ * La URL anterior /administrador/tipos-descuento redirige a /tipodescuento/index (index.php raíz).
  */
-class TipoDescuentoController
+class TipoDescuentoController extends Controller
 {
-    private TipoDescuentoBusiness $tipos;
+    protected int $role = self::ADMIN;
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireAdmin();
-        $this->tipos = new TipoDescuentoBusiness($conexion);
-    }
-
-    /** aplica_a solo puede ser colegiatura o inscripción. */
-    private function aplica(string $a): string
-    {
-        return $a === 'inscripcion' ? 'inscripcion' : 'colegiatura';
+        $this->view('admin/tipos_descuento');
     }
 
     public function listar(): void
     {
-        response(200, true, 'Tipos de descuento obtenidos.', ['items' => $this->tipos->listar()]);
+        $this->api->command('Tipos_descuento', 'TipoDescuento', 'List');
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Tipos de descuento obtenidos.', ['items' => TipoDescuento::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function crear(): void
+    /** Sin IdDescuento es un alta; con él, un cambio. $Porcentaje llega aparte para revisar que sí sea un número. */
+    public function guardar(TipoDescuento $descuento, string $Porcentaje = ''): void
     {
-        $nombre = trim($_POST['nombre'] ?? '');
-        $pct    = filter_var($_POST['porcentaje'] ?? '', FILTER_VALIDATE_FLOAT);
-        $aplica = $this->aplica($_POST['aplica_a'] ?? 'colegiatura');
-        if ($nombre === '')                            response(400, false, 'El nombre es obligatorio.');
-        if ($pct === false || $pct < 0 || $pct > 100)  response(400, false, 'El porcentaje debe estar entre 0 y 100.');
-        if (!$this->tipos->crear($nombre, $pct, $aplica)) response(500, false, 'No se pudo crear el descuento.');
-        response(201, true, 'Tipo de descuento creado.');
+        $this->ensure($descuento->Nombre !== '', 'El nombre es obligatorio.');
+        $this->ensure((bool) preg_match('/^.{1,80}$/us', $descuento->Nombre), 'El nombre admite máximo 80 caracteres.');
+        $this->ensure(is_numeric($Porcentaje) && $descuento->Porcentaje >= 0 && $descuento->Porcentaje <= 100,
+                      'El porcentaje debe estar entre 0 y 100.');
+        $this->ensure(in_array($descuento->AplicaA, TipoDescuento::TARGETS, true), 'El descuento aplica a colegiatura o a inscripción.');
+
+        if (!$descuento->IdDescuento) {
+            $this->api->command('Tipos_descuento', 'TipoDescuento', 'Insert');
+        } else {
+            $this->api->command('Tipos_descuento', 'TipoDescuento', 'Update');
+            $this->api->addParameter('IdDescuento', 'I', $descuento->IdDescuento);
+            $this->api->addParameter('Activo',      'B', $descuento->Activo);
+        }
+        $this->api->addParameter('Nombre',     'S', $descuento->Nombre);
+        $this->api->addParameter('Porcentaje', 'N', $descuento->Porcentaje);
+        $this->api->addParameter('AplicaA',    'S', $descuento->AplicaA);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$descuento->IdDescuento) $this->success('Tipo de descuento creado.', ['IdDescuento' => $result->id()], 201);
+            $this->success('Tipo de descuento actualizado.');
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function editar(): void
+    public function eliminar(int $IdDescuento): void
     {
-        $id     = (int) ($_POST['id_descuento'] ?? 0);
-        $nombre = trim($_POST['nombre'] ?? '');
-        $pct    = filter_var($_POST['porcentaje'] ?? '', FILTER_VALIDATE_FLOAT);
-        $aplica = $this->aplica($_POST['aplica_a'] ?? 'colegiatura');
-        $activo = (int) ($_POST['activo'] ?? 1) === 0 ? 0 : 1;
-        if ($id <= 0)                                  response(400, false, 'Registro no válido.');
-        if ($nombre === '')                            response(400, false, 'El nombre es obligatorio.');
-        if ($pct === false || $pct < 0 || $pct > 100)  response(400, false, 'El porcentaje debe estar entre 0 y 100.');
-        if (!$this->tipos->editar($id, $nombre, $pct, $aplica, $activo)) response(500, false, 'No se pudo actualizar el descuento.');
-        response(200, true, 'Tipo de descuento actualizado.');
-    }
+        $this->api->command('Tipos_descuento', 'TipoDescuento', 'Delete');
+        $this->api->addParameter('IdDescuento', 'I', $IdDescuento);
+        $result = $this->api->execute();
 
-    public function eliminar(): void
-    {
-        $id = (int) ($_POST['id_descuento'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        if ($this->tipos->tieneColegiaturas($id)) response(409, false, 'No se puede eliminar: hay pagos con este descuento aplicado. Puedes desactivarlo.');
-        $this->tipos->eliminar($id);
-        response(200, true, 'Tipo de descuento eliminado.');
+        if (!$result->status()) {
+            $this->ensure($result->affected() > 0, 'No se encontró el descuento.', 404);
+            $this->success('Tipo de descuento eliminado.');
+        } else {
+            $this->failure($result);
+        }
     }
 }

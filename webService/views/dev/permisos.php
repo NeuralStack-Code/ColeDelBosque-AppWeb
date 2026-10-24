@@ -1,7 +1,5 @@
 <?php
-$rol = 4;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de permisos (roles). La pinta PermisoController::index(). Recibe $base. Su JavaScript llama a /permiso/<método>. */
 $title = 'Permisos | Desarrollador';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -45,8 +43,8 @@ $img = $base . '/webService/wwwroot/img';
         <div class="modal-in">
             <h3 id="modalTitulo">Nuevo rol</h3>
             <form id="form">
-                <input type="hidden" id="id_permiso">
-                <div class="campo"><label>Nombre del rol</label><input type="text" id="nombre" placeholder="Ej. Coordinador" required></div>
+                <input type="hidden" name="IdPermiso">
+                <div class="campo"><label>Nombre del rol</label><input type="text" name="Nombre" maxlength="25" placeholder="Ej. Coordinador" required></div>
                 <div class="modal-acciones">
                     <button type="button" class="btn btn-fantasma" onclick="modal.close()">Cancelar</button>
                     <button type="submit" class="btn btn-primario">Guardar</button>
@@ -56,29 +54,29 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/permisos';
+        const API = window.BASE_URL + '/permiso';   // cada método del controller es una URL: /permiso/listar…
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
         const form = document.getElementById('form');
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            const items = d.items || [];
+            const result = await (await fetch(API + '/listar')).json();
+            const items = result.data.items || [];
             filas.innerHTML = '';
             vacio.style.display = items.length ? 'none' : 'block';
             items.forEach(p => {
-                const base = Number(p.id_permiso) >= 1 && Number(p.id_permiso) <= 4;
+                const base = p.IdPermiso >= 1 && p.IdPermiso <= 4;      // roles base del sistema: no se borran
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><code>${p.id_permiso}</code></td>
-                    <td><strong>${p.nombre}</strong>${base ? ' <small style="color:var(--texto-suave)">(sistema)</small>' : ''}</td>
-                    <td>${p.num_cuentas}</td>
+                    <td><code>${p.IdPermiso}</code></td>
+                    <td><strong>${p.Nombre}</strong>${base ? ' <small style="color:var(--texto-suave)">(sistema)</small>' : ''}</td>
+                    <td>${p.NumCuentas}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         ${base ? '' : `<button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>`}
@@ -92,33 +90,30 @@ $img = $base . '/webService/wwwroot/img';
 
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nuevo rol';
-            form.reset(); document.getElementById('id_permiso').value = ''; modal.showModal();
+            form.reset(); form.elements.IdPermiso.value = ''; modal.showModal();
         }
+
         function abrirEdicion(p) {
             document.getElementById('modalTitulo').textContent = 'Editar rol';
-            document.getElementById('id_permiso').value = p.id_permiso;
-            document.getElementById('nombre').value = p.nombre;
+            form.elements.IdPermiso.value = p.IdPermiso;
+            form.elements.Nombre.value = p.Nombre;
             modal.showModal();
         }
 
+        // Guardar: con IdPermiso es un cambio; sin él, un alta.
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const id = document.getElementById('id_permiso').value;
-            const fd = new FormData();
-            fd.append('nombre', document.getElementById('nombre').value);
-            let accion = 'crear';
-            if (id) { accion = 'editar'; fd.append('id_permiso', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { modal.close(); cargar(); }
+            const result = await (await fetch(API + '/guardar', { method: 'POST', body: new FormData(form) })).json();
+            window.notifyResponse(result);
+            if (result.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(p) {
-            if (!await window.confirmar(`¿Eliminar el rol "${p.nombre}"?`)) return;
-            const fd = new FormData(); fd.append('id_permiso', p.id_permiso);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) cargar();
+            if (!await window.confirmar(`¿Eliminar el rol "${p.Nombre}"?`)) return;
+            const fd = new FormData(); fd.append('IdPermiso', p.IdPermiso);
+            const result = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
+            window.notifyResponse(result);
+            if (result.success) cargar();
         }
 
         cargar();

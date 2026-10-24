@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de finanzas (recibos). La pinta ReciboController::index(). Recibe $base. Su JavaScript llama a /recibo/<método>. */
 $title = 'Recibos | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -31,8 +29,8 @@ $img = $base . '/webService/wwwroot/img';
         <div class="admin-cab">
             <h2>Finanzas</h2>
             <div style="display:flex;gap:10px;">
-                <a class="btn btn-fantasma" href="<?= $base ?>/administrador/esquemas-pago">Esquemas de pago</a>
-                <a class="btn btn-fantasma" href="<?= $base ?>/administrador/tipos-recibo">Tipos de recibo</a>
+                <a class="btn btn-fantasma" href="<?= $base ?>/esquemapago/index">Esquemas de pago</a>
+                <a class="btn btn-fantasma" href="<?= $base ?>/tiporecibo/index">Tipos de recibo</a>
                 <button class="btn btn-primario" onclick="abrirAlta()">+ Nuevo recibo</button>
             </div>
         </div>
@@ -102,7 +100,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/recibos';
+        const API = window.BASE_URL + '/recibo';
         const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const money = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
         const filas = document.getElementById('filas');
@@ -112,60 +110,60 @@ $img = $base . '/webService/wwwroot/img';
         let todos = [], tipos = [], alumnos = [], docentes = [];
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         // ---- Catálogos ----
         async function cargarCatalogos() {
-            const d = await (await fetch(API + '?action=catalogos')).json();
+            const d = (await (await fetch(API + '/catalogos')).json()).data || {};
             tipos = d.tipos || []; alumnos = d.alumnos || []; docentes = d.docentes || [];
-            document.getElementById('tipo_recibo_id').innerHTML = tipos.map(t => `<option value="${t.id_tipo}" data-nat="${t.naturaleza}">${t.nombre}</option>`).join('') || '<option value="">Sin tipos</option>';
-            document.getElementById('fTipo').innerHTML = '<option value="">Todos</option>' + tipos.map(t => `<option value="${t.id_tipo}">${t.nombre}</option>`).join('');
+            document.getElementById('tipo_recibo_id').innerHTML = tipos.map(t => `<option value="${t.IdTipo}" data-nat="${t.Naturaleza}">${t.Nombre}</option>`).join('') || '<option value="">Sin tipos</option>';
+            document.getElementById('fTipo').innerHTML = '<option value="">Todos</option>' + tipos.map(t => `<option value="${t.IdTipo}">${t.Nombre}</option>`).join('');
             document.getElementById('fMes').innerHTML = '<option value="">Todos</option>' + MESES.slice(1).map((n, i) => `<option value="${String(i + 1).padStart(2, '0')}">${n}</option>`).join('');
         }
 
         // ---- Listar + filtros ----
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            todos = d.items || [];
-            const anios = [...new Set(todos.map(r => (r.fecha || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+            const d = await (await fetch(API + '/listar')).json();
+            todos = d.data?.items || [];
+            const anios = [...new Set(todos.map(r => (r.Fecha || '').slice(0, 4)).filter(Boolean))].sort().reverse();
             document.getElementById('fAnio').innerHTML = '<option value="">Todos</option>' + anios.map(a => `<option>${a}</option>`).join('');
             render();
         }
         function filtrar() {
             const nat = fNat.value, tipo = fTipo.value, anio = fAnio.value, mes = fMes.value, q = fBuscar.value.toLowerCase();
             return todos.filter(r => {
-                const f = r.fecha || '';
-                if (nat && r.naturaleza !== nat) return false;
-                if (tipo && String(r.tipo_recibo_id) !== tipo) return false;
+                const f = r.Fecha || '';
+                if (nat && r.Naturaleza !== nat) return false;
+                if (tipo && String(r.IdTipoRecibo) !== tipo) return false;
                 if (anio && f.slice(0, 4) !== anio) return false;
                 if (mes && f.slice(5, 7) !== mes) return false;
-                if (q && !`${r.comentario || ''} ${r.destinatario || ''}`.toLowerCase().includes(q)) return false;
+                if (q && !`${r.Comentario || ''} ${r.Destinatario || ''}`.toLowerCase().includes(q)) return false;
                 return true;
             });
         }
         function render() {
             const f = filtrar();
-            const totIn = f.filter(r => r.naturaleza === 'ingreso').reduce((a, r) => a + Number(r.monto), 0);
-            const totEg = f.filter(r => r.naturaleza === 'gasto').reduce((a, r) => a + Number(r.monto), 0);
+            const totIn = f.filter(r => r.Naturaleza === 'ingreso').reduce((a, r) => a + Number(r.Monto), 0);
+            const totEg = f.filter(r => r.Naturaleza === 'gasto').reduce((a, r) => a + Number(r.Monto), 0);
             kIn.textContent = money(totIn); kEg.textContent = money(totEg); kSaldo.textContent = money(totIn - totEg);
             filas.innerHTML = '';
             vacio.style.display = f.length ? 'none' : 'block';
             f.forEach(r => {
-                const badge = r.naturaleza === 'gasto' ? 'pendiente' : 'pagado';
-                const signo = r.naturaleza === 'gasto' ? 'var(--rojo)' : 'var(--verde)';
+                const badge = r.Naturaleza === 'gasto' ? 'pendiente' : 'pagado';
+                const signo = r.Naturaleza === 'gasto' ? 'var(--rojo)' : 'var(--verde)';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${(r.fecha || '').replace('T', ' ').slice(0, 16)}</td>
-                    <td>${r.tipo_nombre || '—'}</td>
-                    <td>${r.destinatario || '—'}</td>
-                    <td><span class="badge-estatus ${badge}">${r.naturaleza}</span></td>
-                    <td style="color:${signo};font-weight:700;">${money(r.monto)}</td>
-                    <td>${r.tipo_pago || '—'}</td>
-                    <td>${r.comentario || '—'}</td>
+                    <td>${(r.Fecha || '').replace('T', ' ').slice(0, 16)}</td>
+                    <td>${r.TipoNombre || '—'}</td>
+                    <td>${r.Destinatario || '—'}</td>
+                    <td><span class="badge-estatus ${badge}">${r.Naturaleza}</span></td>
+                    <td style="color:${signo};font-weight:700;">${money(r.Monto)}</td>
+                    <td>${r.TipoPago || '—'}</td>
+                    <td>${r.Comentario || '—'}</td>
                     <td><div class="acciones">
-                        <a class="icon-btn" href="${window.BASE_URL}/recibo?id=${r.id_recibo}" target="_blank" title="Ver recibo" style="background:var(--azul-claro);color:var(--azul-marca)"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></a>
+                        <a class="icon-btn" href="${window.BASE_URL}/recibo/imprimir?IdRecibo=${r.IdRecibo}" target="_blank" title="Ver recibo" style="background:var(--azul-claro);color:var(--azul-marca)"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg></a>
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
                     </div></td>`;
@@ -183,9 +181,9 @@ $img = $base . '/webService/wwwroot/img';
             if (!f.length) { window.notify('info', 'No hay recibos para exportar.'); return; }
             const head = ['Fecha', 'Tipo', 'Destinatario', 'Naturaleza', 'Monto', 'Tipo de pago', 'Comentario'];
             const rows = f.map(r => [
-                (r.fecha || '').replace('T', ' ').slice(0, 16),
-                r.tipo_nombre || '', r.destinatario || '', r.naturaleza || '',
-                r.monto, r.tipo_pago || '', r.comentario || ''
+                (r.Fecha || '').replace('T', ' ').slice(0, 16),
+                r.TipoNombre || '', r.Destinatario || '', r.Naturaleza || '',
+                r.Monto, r.TipoPago || '', r.Comentario || ''
             ].map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
             const csv = '﻿' + [head.join(','), ...rows].join('\n');
             const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -207,7 +205,7 @@ $img = $base . '/webService/wwwroot/img';
             if (dt === 'escuela') { campo.style.display = 'none'; return; }
             const lista = dt === 'alumno' ? alumnos : docentes;
             document.getElementById('lblPersona').textContent = dt === 'alumno' ? 'Alumno' : 'Docente';
-            sel.innerHTML = lista.map(p => `<option value="${p.id_cuenta}">${p.nombre}</option>`).join('') || '<option value="">Sin registros</option>';
+            sel.innerHTML = lista.map(p => `<option value="${p.IdCuenta}">${p.Nombre}</option>`).join('') || '<option value="">Sin registros</option>';
             campo.style.display = 'block';
         }
 
@@ -223,16 +221,16 @@ $img = $base . '/webService/wwwroot/img';
         }
         function abrirEdicion(r) {
             document.getElementById('modalTitulo').textContent = 'Editar recibo';
-            document.getElementById('id_recibo').value = r.id_recibo;
-            document.getElementById('tipo_recibo_id').value = r.tipo_recibo_id ?? '';
-            document.getElementById('naturaleza').value = r.naturaleza;
-            document.getElementById('destinatario_tipo').value = r.destinatario_tipo;
+            document.getElementById('id_recibo').value = r.IdRecibo;
+            document.getElementById('tipo_recibo_id').value = r.IdTipoRecibo ?? '';
+            document.getElementById('naturaleza').value = r.Naturaleza;
+            document.getElementById('destinatario_tipo').value = r.DestinatarioTipo;
             pintarPersona();
-            if (r.destinatario_tipo !== 'escuela') document.getElementById('cuenta_id').value = r.cuenta_id ?? '';
-            document.getElementById('monto').value = Number(r.monto) || '';
-            document.getElementById('tipo_pago').value = r.tipo_pago || 'Efectivo';
-            document.getElementById('comentario').value = r.comentario ?? '';
-            document.getElementById('fecha').value = (r.fecha || '').replace(' ', 'T').slice(0, 16);
+            if (r.DestinatarioTipo !== 'escuela') document.getElementById('cuenta_id').value = r.IdCuenta ?? '';
+            document.getElementById('monto').value = Number(r.Monto) || '';
+            document.getElementById('tipo_pago').value = r.TipoPago || 'Efectivo';
+            document.getElementById('comentario').value = r.Comentario ?? '';
+            document.getElementById('fecha').value = (r.Fecha || '').replace(' ', 'T').slice(0, 16);
             modal.showModal();
         }
 
@@ -240,25 +238,25 @@ $img = $base . '/webService/wwwroot/img';
             e.preventDefault();
             const id = document.getElementById('id_recibo').value;
             const fd = new FormData();
-            fd.append('tipo_recibo_id', document.getElementById('tipo_recibo_id').value);
-            fd.append('naturaleza', document.getElementById('naturaleza').value);
-            fd.append('destinatario_tipo', document.getElementById('destinatario_tipo').value);
-            fd.append('cuenta_id', document.getElementById('cuenta_id').value || '');
-            fd.append('monto', document.getElementById('monto').value);
-            fd.append('tipo_pago', document.getElementById('tipo_pago').value);
-            fd.append('comentario', document.getElementById('comentario').value);
-            fd.append('fecha', document.getElementById('fecha').value);
-            let accion = 'crear';
-            if (id) { accion = 'editar'; fd.append('id_recibo', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
+            // Cada campo viaja con el nombre de la propiedad del model Recibo
+            fd.append('IdTipoRecibo', document.getElementById('tipo_recibo_id').value);
+            fd.append('Naturaleza', document.getElementById('naturaleza').value);
+            fd.append('DestinatarioTipo', document.getElementById('destinatario_tipo').value);
+            fd.append('IdCuenta', document.getElementById('cuenta_id').value || '');
+            fd.append('Monto', document.getElementById('monto').value);
+            fd.append('TipoPago', document.getElementById('tipo_pago').value);
+            fd.append('Comentario', document.getElementById('comentario').value);
+            fd.append('Fecha', document.getElementById('fecha').value);
+            if (id) fd.append('IdRecibo', id);
+            const d = await (await fetch(API + '/guardar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(r) {
-            if (!await window.confirmar(`¿Eliminar este recibo de ${money(r.monto)}?`)) return;
-            const fd = new FormData(); fd.append('id_recibo', r.id_recibo);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
+            if (!await window.confirmar(`¿Eliminar este recibo de ${money(r.Monto)}?`)) return;
+            const fd = new FormData(); fd.append('IdRecibo', r.IdRecibo);
+            const d = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargar();
         }

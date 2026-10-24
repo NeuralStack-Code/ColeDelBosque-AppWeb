@@ -1,6 +1,5 @@
 <?php
-if (!defined('BASE_URL')) require_once __DIR__ . '/../../../apiService/core/config.php';
-$base     = BASE_URL;
+/** Pantalla de contacto. La pinta ContactoController::index(). Recibe $base. Los campos se llaman como el parámetro que reciben. */
 $title    = 'Contacto | Colegio del Bosque';
 $activa   = 'contacto';
 $extraCss = ['contacto.css'];
@@ -34,15 +33,15 @@ $img      = $base . '/webService/wwwroot/img';
                 <form id="formContacto" method="post">
                     <div class="campo">
                         <label for="nombre">Nombre completo</label>
-                        <input name="nombre" type="text" id="nombre" required placeholder="Nombre Apellido Apellido">
+                        <input name="Nombre" type="text" id="nombre" maxlength="100" required placeholder="Nombre Apellido Apellido">
                     </div>
                     <div class="campo">
                         <label for="tel">Teléfono</label>
-                        <input name="tel" type="tel" id="tel" required placeholder="(XX) XXXX-XXXX">
+                        <input name="Telefono" type="tel" id="tel" maxlength="30" required placeholder="(XX) XXXX-XXXX">
                     </div>
                     <div class="campo">
                         <label for="coment">Comentario</label>
-                        <textarea name="coment" id="coment" required placeholder="Cuéntanos en qué podemos ayudarte..."></textarea>
+                        <textarea name="Comentario" id="coment" maxlength="3000" required placeholder="Cuéntanos en qué podemos ayudarte..."></textarea>
                     </div>
                     <input type="submit" value="Enviar mensaje" class="btn btn-primario enviar">
                 </form>
@@ -80,14 +79,14 @@ $img      = $base . '/webService/wwwroot/img';
 <?php require __DIR__ . '/../partials/footer.php'; ?>
 
     <script>
-        // Enviar el formulario de contacto a la API
+        // Enviar el mensaje: /contacto/enviar
         const formContacto = document.getElementById('formContacto');
         formContacto.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = formContacto.querySelector('[type="submit"]');
             btn.disabled = true;
             try {
-                const r = await fetch(window.BASE_URL + '/api/contacto', {
+                const r = await fetch(window.BASE_URL + '/contacto/enviar', {
                     method: 'POST',
                     body: new FormData(formContacto)
                 });

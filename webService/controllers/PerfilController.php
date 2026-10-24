@@ -1,100 +1,109 @@
 <?php
+require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt() / decrypt(): la matrícula se guarda encriptada
 
 /**
- * Recurso: perfiles.  Ruta: /api/perfiles?action=catalogos|listar|crear|editar|eliminar
- * Panel del desarrollador (permiso 4): alta/edición/baja de cuentas de cualquier rol.
+ * Perfiles: alta, cambio y baja de cuentas de cualquier rol (solo el desarrollador).
+ *   /perfil/index      → pantalla de perfiles
+ *   /perfil/catalogos  → roles, grupos y estatus para el formulario
+ *   /perfil/listar     → las cuentas (?IdPermiso= para un solo rol)
+ *   /perfil/guardar    → alta o cambio
+ *   /perfil/eliminar   → baja de la cuenta con todo lo suyo (colegiaturas, calificaciones, recibos)
+ * La URL anterior /desarrollador/perfiles redirige a /perfil/index (index.php raíz).
  */
-class PerfilController
+class PerfilController extends Controller
 {
-    private PerfilBusiness $perfiles;
+    protected int $role = self::DEVELOPER;
+    protected array $readActions = ['index', 'listar', 'catalogos'];
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireDev();
-        $this->perfiles = new PerfilBusiness($conexion);
-    }
-
-    /** Roles con grupo (maestro=2, alumno=3). Admin/dev no llevan grupo. */
-    private function rolLlevaGrupo(int $permiso): bool
-    {
-        return $permiso === 2 || $permiso === 3;
+        $this->view('dev/perfiles');
     }
 
     public function catalogos(): void
     {
-        response(200, true, 'Catálogos.', [
-            'permisos' => $this->perfiles->permisos(),
-            'grupos'   => $this->perfiles->grupos(),
-            'estatus'  => $this->perfiles->estatusAlumno(),
-        ]);
-    }
+        $this->api->command('Permisos', 'Permiso', 'List');
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $permisos = Permiso::fromTable($result->table());
 
-    public function listar(): void
-    {
-        $filtro = (int) ($_GET['permiso_id'] ?? 0);
-        response(200, true, 'Perfiles obtenidos.', ['items' => $this->perfiles->listar($filtro)]);
-    }
+        $this->api->command('Perfiles', 'Perfil', 'Groups');
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $grupos = GrupoOpcion::fromTable($result->table());
 
-    public function crear(): void
-    {
-        $nombre   = trim($_POST['nombre'] ?? '');
-        $paterno  = trim($_POST['paterno'] ?? '');
-        $materno  = trim($_POST['materno'] ?? '');
-        $mat      = trim($_POST['matricula'] ?? '');
-        $permiso  = (int) ($_POST['permiso_id'] ?? 0);
-        $grupo    = $this->rolLlevaGrupo($permiso) ? (int) ($_POST['grupo_id'] ?? 0) : 0;
-        $claveEst = trim($_POST['estatus'] ?? 'activo');
+        $this->api->command('Perfiles', 'Perfil', 'Statuses');
+        $result = $this->api->execute();
 
-        if ($nombre === '' || $paterno === '') response(400, false, 'Nombre y apellido paterno son obligatorios.');
-        if (strlen($mat) < 4)                  response(400, false, 'La matrícula debe tener al menos 4 caracteres.');
-        if (!$this->perfiles->permisoExiste($permiso)) response(400, false, 'Rol (permiso) no válido.');
-        if ($this->perfiles->matriculaExiste($mat))    response(409, false, 'La matrícula ya existe.');
-
-        if (!$this->perfiles->crear($nombre, $paterno, $materno, $mat, $permiso, $grupo, $claveEst)) {
-            response(500, false, 'No se pudo crear la cuenta.');
+        if (!$result->status()) {
+            $this->success('Catálogos.', ['permisos' => $permisos, 'grupos' => $grupos, 'estatus' => EstatusOpcion::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
         }
-        response(201, true, 'Perfil creado.');
     }
 
-    public function editar(): void
+    public function listar(int $IdPermiso = 0): void
     {
-        $id       = (int) ($_POST['id_cuenta'] ?? 0);
-        $nombre   = trim($_POST['nombre'] ?? '');
-        $paterno  = trim($_POST['paterno'] ?? '');
-        $materno  = trim($_POST['materno'] ?? '');
-        $mat      = trim($_POST['matricula'] ?? '');
-        $permiso  = (int) ($_POST['permiso_id'] ?? 0);
-        $grupo    = $this->rolLlevaGrupo($permiso) ? (int) ($_POST['grupo_id'] ?? 0) : 0;
-        $claveEst = trim($_POST['estatus'] ?? 'activo');
+        $this->api->command('Perfiles', 'Perfil', 'List');
+        $this->api->addParameter('IdPermiso', 'I', $IdPermiso);
+        $result = $this->api->execute();
 
-        if ($id <= 0)                          response(400, false, 'Registro no válido.');
-        if ($nombre === '' || $paterno === '') response(400, false, 'Nombre y apellido paterno son obligatorios.');
-        if (strlen($mat) < 4)                  response(400, false, 'La matrícula debe tener al menos 4 caracteres.');
-
-        $usuarioId = $this->perfiles->obtenerUsuarioId($id);
-        if ($usuarioId === null) response(404, false, 'No se encontró la cuenta.');
-
-        if ($this->perfiles->matriculaExiste($mat, $id)) response(409, false, 'La matrícula ya existe en otra cuenta.');
-
-        if (!$this->perfiles->editar($id, $usuarioId, $nombre, $paterno, $materno, $mat, $permiso, $grupo, $claveEst)) {
-            response(500, false, 'No se pudo actualizar la cuenta.');
+        if (!$result->status()) {
+            $perfiles = Perfil::fromTable($result->table());
+            foreach ($perfiles as $perfil) {
+                $perfil->Matricula = (string) decrypt($perfil->Matricula);   // en la base va encriptada: aquí se muestra legible
+            }
+            $this->success('Perfiles obtenidos.', ['items' => $perfiles]);
+        } else {
+            $this->failure($result);
         }
-        response(200, true, 'Perfil actualizado.');
     }
 
-    public function eliminar(): void
+    /** Sin IdCuenta es un alta; con ella, un cambio. */
+    public function guardar(Perfil $perfil): void
     {
-        $id = (int) ($_POST['id_cuenta'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
+        $this->ensure($perfil->Nombre !== '' && $perfil->Paterno !== '', 'Nombre y apellido paterno son obligatorios.');   // el materno nunca es obligatorio
+        $fits = fn(?string $text): bool => (bool) preg_match('/^.{0,25}$/us', (string) $text);
+        $this->ensure($fits($perfil->Nombre) && $fits($perfil->Paterno) && $fits($perfil->Materno),
+                      'El nombre y los apellidos admiten máximo 25 caracteres cada uno.');
+        $this->ensure(strlen($perfil->Matricula) >= 4, 'La matrícula debe tener al menos 4 caracteres.');
+        $this->ensure(strlen($perfil->Matricula) <= 60, 'La matrícula admite máximo 60 caracteres.');
+        $this->ensure($perfil->IdPermiso > 0, 'Rol (permiso) no válido.');
 
-        $usuarioId = $this->perfiles->obtenerUsuarioId($id);
-        if ($usuarioId === null) response(404, false, 'No se encontró el registro.');
-
-        if ($usuarioId === (int) ($_SESSION['id'] ?? 0)) response(409, false, 'No puedes eliminar tu propia cuenta.');
-
-        if (!$this->perfiles->eliminarCascada($id, $usuarioId)) {
-            response(500, false, 'No se pudo eliminar: hay datos relacionados que lo impiden.');
+        if (!$perfil->IdCuenta) {
+            $this->api->command('Perfiles', 'Perfil', 'Insert');
+        } else {
+            $this->api->command('Perfiles', 'Perfil', 'Update');
+            $this->api->addParameter('IdCuenta', 'I', $perfil->IdCuenta);
         }
-        response(200, true, 'Perfil y sus datos relacionados eliminados.');
+        $this->api->addParameter('Nombre',    'S', $perfil->Nombre);
+        $this->api->addParameter('Paterno',   'S', $perfil->Paterno);
+        $this->api->addParameter('Materno',   'S', $perfil->Materno);
+        $this->api->addParameter('Matricula', 'S', encrypt($perfil->Matricula));
+        $this->api->addParameter('IdPermiso', 'I', $perfil->IdPermiso);
+        $this->api->addParameter('IdGrupo',   'I', $perfil->hasGroup() ? $perfil->IdGrupo : 0);   // administrador y desarrollador no llevan grupo
+        $this->api->addParameter('Estatus',   'S', $perfil->Estatus);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$perfil->IdCuenta) $this->success('Perfil creado.', ['IdCuenta' => $result->id()], 201);
+            $this->success('Perfil actualizado.');
+        } else {
+            $this->failure($result);
+        }
+    }
+
+    public function eliminar(int $IdCuenta): void
+    {
+        $this->api->command('Perfiles', 'Perfil', 'Delete');
+        $this->api->addParameter('IdCuenta',        'I', $IdCuenta);
+        $this->api->addParameter('IdUsuarioSesion', 'I', $this->userId());
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Perfil y sus datos relacionados eliminados.');
+        } else {
+            $this->failure($result);
+        }
     }
 }

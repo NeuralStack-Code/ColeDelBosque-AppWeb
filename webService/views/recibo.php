@@ -1,53 +1,11 @@
 <?php
 /**
- * Recibo de pago imprimible.  /recibo?id=<id_recibo>
- * Acceso: admin (cualquiera) · padre (solo los suyos).
+ * Recibo de pago imprimible. Lo pinta ReciboController::imprimir() (que ya revisó quién lo puede ver).
+ * Recibe $base, $recibo (model Recibo) y $volver (a dónde regresa el botón).
  */
-if (!defined('BASE_URL')) require_once __DIR__ . '/../../apiService/core/config.php';
-if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-if (!isset($_SESSION['usuario'])) { header('Location: ' . BASE_URL . '/inicio-sesion'); exit; }
-
-require_once __DIR__ . '/../../apiService/core/conexionBDD.php';
-
-$permiso = (int) ($_SESSION['permiso'] ?? 0);
-$id      = (int) ($_GET['id'] ?? 0);
-$base    = BASE_URL;
-
-$stmt = mysqli_prepare($conexion,
-    'SELECT r.id_recibo, r.naturaleza, r.destinatario_tipo, r.cuenta_id, r.monto, r.tipo_pago, r.comentario, r.fecha,
-            t.nombre AS tipo_nombre, u.nombre, u.paterno, u.materno
-     FROM recibo r
-     LEFT JOIN tipo_recibo t ON t.id_tipo = r.tipo_recibo_id
-     LEFT JOIN cuenta c      ON c.id_cuenta = r.cuenta_id
-     LEFT JOIN usuario u     ON u.id_usuario = c.usuario_id
-     WHERE r.id_recibo = ? LIMIT 1');
-mysqli_stmt_bind_param($stmt, 'i', $id);
-mysqli_stmt_execute($stmt);
-$r = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-mysqli_stmt_close($stmt);
-
-if (!$r) { http_response_code(404); exit('Recibo no encontrado.'); }
-
-// Autorización del padre: solo sus propios recibos
-if ($permiso === 3) {
-    $uid = (int) ($_SESSION['id'] ?? 0);
-    $q = mysqli_prepare($conexion, 'SELECT 1 FROM cuenta WHERE usuario_id = ? AND id_cuenta = ? AND permiso_id = 3 LIMIT 1');
-    mysqli_stmt_bind_param($q, 'ii', $uid, $r['cuenta_id']);
-    mysqli_stmt_execute($q);
-    $ok = (bool) mysqli_fetch_row(mysqli_stmt_get_result($q));
-    mysqli_stmt_close($q);
-    if (!$ok) { http_response_code(403); exit('No tienes acceso a este recibo.'); }
-}
-
-$destinatario = $r['destinatario_tipo'] === 'escuela' ? 'Escuela' : trim("$r[nombre] $r[paterno] $r[materno]");
-$etiquetaDest = $r['destinatario_tipo'] === 'alumno' ? 'Alumno'
-    : ($r['destinatario_tipo'] === 'docente' ? 'Docente'
-    : ($r['naturaleza'] === 'ingreso' ? 'Recibí de' : 'Pagado a'));
-$concepto = $r['comentario'] ?: ($r['tipo_nombre'] ?? '—');
-$folio = str_pad((string) $r['id_recibo'], 6, '0', STR_PAD_LEFT);
-$fecha = date('d/m/Y H:i', strtotime($r['fecha']));
-$money = fn($n) => '$' . number_format((float) $n, 2);
-$esIngreso = $r['naturaleza'] === 'ingreso';
+$folio = $recibo->folio();
+$fecha = date('d/m/Y H:i', strtotime($recibo->Fecha));
+$esIngreso = $recibo->esIngreso();
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -95,7 +53,7 @@ $esIngreso = $r['naturaleza'] === 'ingreso';
 </head>
 <body>
     <div class="barra">
-        <a class="btn btn-g" href="<?= $base ?>/<?= $permiso === 1 ? 'administrador/recibos' : 'padre' ?>">← Volver</a>
+        <a class="btn btn-g" href="<?= $base . $volver ?>">← Volver</a>
         <button class="btn btn-p" onclick="window.print()">🖨️ Imprimir / Guardar PDF</button>
     </div>
 
@@ -112,17 +70,17 @@ $esIngreso = $r['naturaleza'] === 'ingreso';
             </div>
         </div>
 
-        <div class="tipo"><?= $esIngreso ? 'Recibo de pago' : 'Comprobante de egreso' ?> · <?= htmlspecialchars($r['tipo_nombre'] ?? 'General') ?></div>
+        <div class="tipo"><?= $esIngreso ? 'Recibo de pago' : 'Comprobante de egreso' ?> · <?= e($recibo->TipoNombre ?? 'General') ?></div>
 
         <div class="body">
             <div class="fila"><span class="k">Fecha</span><span class="v"><?= $fecha ?></span></div>
-            <div class="fila"><span class="k"><?= $etiquetaDest ?></span><span class="v"><?= htmlspecialchars($destinatario) ?></span></div>
-            <div class="fila"><span class="k">Concepto</span><span class="v"><?= htmlspecialchars($concepto) ?></span></div>
-            <div class="fila"><span class="k">Método de pago</span><span class="v"><?= htmlspecialchars($r['tipo_pago'] ?: '—') ?></span></div>
+            <div class="fila"><span class="k"><?= e($recibo->etiquetaDestinatario()) ?></span><span class="v"><?= e($recibo->Destinatario) ?></span></div>
+            <div class="fila"><span class="k">Concepto</span><span class="v"><?= e($recibo->concepto()) ?></span></div>
+            <div class="fila"><span class="k">Método de pago</span><span class="v"><?= e($recibo->TipoPago ?: '—') ?></span></div>
 
             <div class="monto">
                 <span>Monto</span>
-                <strong><?= $money($r['monto']) ?></strong>
+                <strong><?= money($recibo->Monto) ?></strong>
             </div>
         </div>
 

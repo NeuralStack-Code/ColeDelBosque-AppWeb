@@ -1,107 +1,74 @@
 <?php
-/**
- * Ingresos/egresos de la escuela (tabla recibo). Aquí vive el SQL.
- */
-class ReciboBusiness
+/** Entidad Recibo: los ingresos y egresos de la escuela (tabla recibo). Procedures: webService/sql/sp/sp_recibo.sql. */
+class ReciboBusiness extends Entity
 {
-    private mysqli $db;
+    public ?int    $IdRecibo         = null;
+    public ?int    $IdTipoRecibo     = null;
+    public string  $Naturaleza       = 'ingreso';
+    public string  $DestinatarioTipo = 'escuela';
+    public ?int    $IdCuenta         = null;
+    public float   $Monto            = 0.0;
+    public ?string $TipoPago         = null;
+    public ?string $Comentario       = null;
+    public string  $Fecha            = '';
+    public ?int    $IdPermiso        = null;   // de quiénes se quiere la lista: 3 alumnos · 2 docentes
 
-    public function __construct(mysqli $db)
+    /** Las cuentas de un rol para elegir destinatario. */
+    public function people(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_recibo_personas');
+        $this->db->addParameter('IdPermiso', $this->IdPermiso);
+        return $this->db->execute();
     }
 
-    /** Tipos de recibo para el formulario. */
-    public function tipos(): array
+    public function list(): array
     {
-        $tipos = [];
-        $res = mysqli_query($this->db, 'SELECT id_tipo, nombre, naturaleza FROM tipo_recibo ORDER BY nombre');
-        while ($r = mysqli_fetch_assoc($res)) $tipos[] = $r;
-        return $tipos;
+        $this->db->command('sp_recibo_listar');
+        return $this->db->execute();
     }
 
-    /** Personas por permiso (3=alumno, 2=docente) para el select de destinatario. */
-    public function personas(int $permiso): array
+    /** Un recibo (tabla vacía si no existe). */
+    public function get(): array
     {
-        $stmt = mysqli_prepare($this->db,
-            'SELECT c.id_cuenta, u.nombre, u.paterno, u.materno
-             FROM cuenta c JOIN usuario u ON u.id_usuario = c.usuario_id
-             WHERE c.permiso_id = ? ORDER BY u.paterno, u.nombre');
-        mysqli_stmt_bind_param($stmt, 'i', $permiso);
-        mysqli_stmt_execute($stmt);
-        $res = mysqli_stmt_get_result($stmt);
-        $out = [];
-        while ($r = mysqli_fetch_assoc($res)) {
-            $out[] = ['id_cuenta' => $r['id_cuenta'], 'nombre' => trim("$r[nombre] $r[paterno] $r[materno]")];
-        }
-        mysqli_stmt_close($stmt);
-        return $out;
+        $this->db->command('sp_recibo_obtener');
+        $this->db->addParameter('IdRecibo', $this->IdRecibo);
+        return $this->db->execute();
     }
 
-    /** Lista de recibos + saldo acumulado. @return array{items:array,saldo:float} */
-    public function listar(): array
+    /** Regresa el Id nuevo. 'invalido' si el destinatario no es de ese rol. */
+    public function insert(): array
     {
-        $sql = 'SELECT r.id_recibo, r.tipo_recibo_id, r.naturaleza, r.destinatario_tipo, r.cuenta_id,
-                       r.monto, r.tipo_pago, r.comentario, r.fecha,
-                       t.nombre AS tipo_nombre,
-                       u.nombre, u.paterno, u.materno
-                FROM recibo r
-                LEFT JOIN tipo_recibo t ON t.id_tipo = r.tipo_recibo_id
-                LEFT JOIN cuenta c      ON c.id_cuenta = r.cuenta_id
-                LEFT JOIN usuario u     ON u.id_usuario = c.usuario_id
-                ORDER BY r.fecha DESC, r.id_recibo DESC';
-        $res = mysqli_query($this->db, $sql);
-        $items = []; $saldo = 0.0;
-        while ($r = mysqli_fetch_assoc($res)) {
-            $r['destinatario'] = $r['destinatario_tipo'] === 'escuela'
-                ? 'Escuela'
-                : trim("$r[nombre] $r[paterno] $r[materno]");
-            $saldo += ($r['naturaleza'] === 'ingreso' ? 1 : -1) * (float) $r['monto'];
-            $items[] = $r;
-        }
-        return ['items' => $items, 'saldo' => $saldo];
+        $this->db->command('sp_recibo_crear');
+        $this->fields();
+        return $this->db->execute();
     }
 
-    /** ¿La cuenta existe con ese permiso (3=alumno, 2=docente)? */
-    public function cuentaValida(int $cuenta, int $permiso): bool
+    /** 'notfound' · 'invalido'. */
+    public function update(): array
     {
-        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM cuenta WHERE id_cuenta = ? AND permiso_id = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 'ii', $cuenta, $permiso);
-        mysqli_stmt_execute($chk);
-        $ok = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
-        mysqli_stmt_close($chk);
-        return $ok;
+        $this->db->command('sp_recibo_editar');
+        $this->db->addParameter('IdRecibo', $this->IdRecibo);
+        $this->fields();
+        return $this->db->execute();
     }
 
-    public function crear(?int $tipo, string $nat, string $dtipo, ?int $cuenta, float $monto, ?string $pago, ?string $com, string $fecha): bool
+    /** Regresa las filas afectadas (0 = no existía). */
+    public function delete(): array
     {
-        $stmt = mysqli_prepare($this->db,
-            'INSERT INTO recibo (tipo_recibo_id, naturaleza, destinatario_tipo, cuenta_id, monto, tipo_pago, comentario, fecha)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'issidsss', $tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_recibo_eliminar');
+        $this->db->addParameter('IdRecibo', $this->IdRecibo);
+        return $this->db->execute();
     }
 
-    public function editar(int $id, ?int $tipo, string $nat, string $dtipo, ?int $cuenta, float $monto, ?string $pago, ?string $com, string $fecha): bool
+    private function fields(): void
     {
-        $stmt = mysqli_prepare($this->db,
-            'UPDATE recibo SET tipo_recibo_id=?, naturaleza=?, destinatario_tipo=?, cuenta_id=?, monto=?, tipo_pago=?, comentario=?, fecha=? WHERE id_recibo=?');
-        mysqli_stmt_bind_param($stmt, 'issidsssi', $tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha, $id);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
-    }
-
-    /** @return int filas afectadas (0 = no existía). */
-    public function eliminar(int $id): int
-    {
-        $stmt = mysqli_prepare($this->db, 'DELETE FROM recibo WHERE id_recibo = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        $af = mysqli_stmt_affected_rows($stmt);
-        mysqli_stmt_close($stmt);
-        return $af;
+        $this->db->addParameter('IdTipoRecibo',     $this->IdTipoRecibo);
+        $this->db->addParameter('Naturaleza',       $this->Naturaleza);
+        $this->db->addParameter('DestinatarioTipo', $this->DestinatarioTipo);
+        $this->db->addParameter('IdCuenta',         $this->IdCuenta);
+        $this->db->addParameter('Monto',            $this->Monto);
+        $this->db->addParameter('TipoPago',         $this->TipoPago);
+        $this->db->addParameter('Comentario',       $this->Comentario);
+        $this->db->addParameter('Fecha',            $this->Fecha);
     }
 }

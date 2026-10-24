@@ -1,97 +1,90 @@
 <?php
-
 /**
- * Recurso: calificaciones.  Ruta: /api/calificaciones?action=contexto|listar|guardar
- * Notas por (alumno, materia, ciclo activo). Solo maestros (permiso 2), acotado a sus grupos:
- * el propio (todas las materias) y los de sus niveles de inglés (solo Inglés). El grupo llega en grupo_id.
+ * Calificaciones por alumno, materia y ciclo activo (solo maestros), acotadas a sus grupos: el propio (todas las
+ * materias) y los de sus niveles de inglés (solo Inglés). Cada método recibe el grupo en que se trabaja (IdGrupo).
+ *   /calificacion/index     → pantalla
+ *   /calificacion/contexto  → grupos de la maestra y materias del grupo
+ *   /calificacion/listar    → alumnos del grupo con sus notas de una materia
+ *   /calificacion/guardar   → notas de un alumno en una materia
+ * La URL anterior /maestro/calificaciones redirige a /calificacion/index (index.php raíz).
  */
-class CalificacionController
+class CalificacionController extends Controller
 {
-    private CalificacionBusiness $cal;
-    private int   $grupoId;
-    private bool  $soloIngles;
-    private array $grupos;
-    private int   $cicloId;
-    private array $ciclo;
+    use ContextoMaestro;
 
-    public function __construct(mysqli $conexion)
+    protected int $role = self::TEACHER;
+    protected array $readActions = ['index', 'contexto', 'listar'];
+
+    public function index(): void
     {
-        requireAuth();
-        if ((int) ($_SESSION['permiso'] ?? 0) !== 2) {
-            response(403, false, 'Solo los maestros pueden acceder a calificaciones.');
-        }
-        $this->cal = new CalificacionBusiness($conexion);
-
-        $ciclo = $this->cal->cicloActivo();
-        if (!$ciclo) response(409, false, 'No hay un ciclo escolar activo. Pide al administrador que active uno.');
-        $this->ciclo   = $ciclo;
-        $this->cicloId = (int) $ciclo['id_ciclo'];
-
-        $this->grupos = $this->cal->gruposDelMaestro((int) ($_SESSION['id'] ?? 0), $this->cicloId);
-        if (!$this->grupos) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
-
-        // Grupo pedido por la vista; sin él (o si no es suyo) se usa el primero
-        $pedido = (int) ($_REQUEST['grupo_id'] ?? 0);
-        $actual = $this->grupos[0];
-        foreach ($this->grupos as $g) if ($g['id_grupo'] === $pedido) $actual = $g;
-        $this->grupoId    = $actual['id_grupo'];
-        $this->soloIngles = $actual['solo_ingles'];
+        $this->view('maestro/calificaciones', ['nombre' => $this->user()]);
     }
 
-    /** '' → null; si no, float validado 0–10. */
-    private function nota($v): ?float
+    public function contexto(int $IdGrupo = 0): void
     {
-        if ($v === '' || $v === null) return null;
-        $n = filter_var($v, FILTER_VALIDATE_FLOAT);
-        if ($n === false)      response(400, false, 'Las calificaciones deben ser números.');
-        if ($n < 0 || $n > 10) response(400, false, 'Las calificaciones deben estar entre 0 y 10.');
-        return (float) $n;
-    }
-
-    public function contexto(): void
-    {
-        response(200, true, 'Contexto obtenido.', [
-            'grupo_id' => $this->grupoId,
+        $this->cargarContexto($IdGrupo);
+        $this->success('Contexto obtenido.', [
+            'IdGrupo'  => $this->grupo->IdGrupo,
             'grupos'   => $this->grupos,
-            'grado'    => $this->cal->gradoDeGrupo($this->grupoId),
-            'materias' => $this->cal->materiasDeGrupo($this->grupoId, $this->soloIngles),
-            'ciclo'    => $this->ciclo['nombre'],
+            'grado'    => $this->grupo->Grado,
+            'materias' => $this->materias(),
+            'ciclo'    => $this->ciclo->Nombre,
         ]);
     }
 
-    public function listar(): void
+    public function listar(int $IdMateria = 0, int $IdGrupo = 0): void
     {
-        $materiaId = (int) ($_GET['materia_id'] ?? 0);
-        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId, $this->soloIngles)) {
-            response(400, false, 'Materia no válida para tu grupo.');
+        $this->cargarContexto($IdGrupo);
+        $this->ensure($IdMateria > 0, 'Materia no válida para tu grupo.');
+
+        $this->api->command('Calificaciones', 'Calificacion', 'List');
+        $this->api->addParameter('IdMateria',  'I', $IdMateria);
+        $this->api->addParameter('IdCiclo',    'I', $this->ciclo->IdCiclo);
+        $this->api->addParameter('IdGrupo',    'I', $this->grupo->IdGrupo);
+        $this->api->addParameter('SoloIngles', 'B', $this->grupo->SoloIngles);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Calificaciones obtenidas.', ['alumnos' => AlumnoCalificacion::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
         }
-        response(200, true, 'Calificaciones obtenidas.', [
-            'alumnos' => $this->cal->alumnosConNotas($materiaId, $this->cicloId, $this->grupoId),
-        ]);
     }
 
-    public function guardar(): void
+    /** Cada nota es opcional (vacía) o un número de 0 a 10. Con calificación final queda aprobado (6 o más) o reprobado. */
+    public function guardar(int $IdCuenta, int $IdMateria, int $IdGrupo = 0, string $P1 = '', string $P2 = '', string $P3 = '',
+                            string $CalifFinal = '', string $Reporte = ''): void
     {
-        $cuentaId  = (int) ($_POST['cuenta_id']  ?? 0);
-        $materiaId = (int) ($_POST['materia_id'] ?? 0);
-        if ($cuentaId <= 0) response(400, false, 'Alumno no válido.');
-        if ($materiaId <= 0 || !$this->cal->materiaEnGrupo($materiaId, $this->grupoId, $this->soloIngles)) {
-            response(400, false, 'Materia no válida para tu grupo.');
-        }
-        if (!$this->cal->alumnoEnGrupo($cuentaId, $this->grupoId)) {
-            response(403, false, 'Ese alumno no pertenece a tu grupo.');
+        $this->cargarContexto($IdGrupo);
+        $notas = [];
+        foreach (['P1' => $P1, 'P2' => $P2, 'P3' => $P3, 'CalifFinal' => $CalifFinal] as $campo => $valor) {
+            $notas[$campo] = $this->nota($valor);
         }
 
-        $p1  = $this->nota($_POST['p1'] ?? '');
-        $p2  = $this->nota($_POST['p2'] ?? '');
-        $p3  = $this->nota($_POST['p3'] ?? '');
-        $fin = $this->nota($_POST['final'] ?? '');
-        $rep = trim($_POST['reporte'] ?? '');
-        $rep = ($rep === '') ? null : $rep;
+        $this->api->command('Calificaciones', 'Calificacion', 'Save');
+        $this->api->addParameter('IdCuenta',   'I', $IdCuenta);
+        $this->api->addParameter('IdMateria',  'I', $IdMateria);
+        $this->api->addParameter('IdCiclo',    'I', $this->ciclo->IdCiclo);
+        $this->api->addParameter('IdGrupo',    'I', $this->grupo->IdGrupo);
+        $this->api->addParameter('SoloIngles', 'B', $this->grupo->SoloIngles);
+        foreach ($notas as $campo => $nota) $this->api->addParameter($campo, 'N', $nota);
+        $this->api->addParameter('Reporte',    'S', $Reporte === '' ? null : $Reporte);
+        $result = $this->api->execute();
 
-        if (!$this->cal->guardar($cuentaId, $materiaId, $this->cicloId, $p1, $p2, $p3, $fin, $rep)) {
-            response(500, false, 'No se pudo guardar la calificación.');
+        if (!$result->status()) {
+            $this->success('Calificación guardada.');
+        } else {
+            $this->failure($result);
         }
-        response(200, true, 'Calificación guardada.');
+    }
+
+    /** '' → sin nota; si no, un número entre 0 y 10 (corta si no lo es). */
+    private function nota(string $valor): ?float
+    {
+        if ($valor === '') return null;
+        $nota = filter_var($valor, FILTER_VALIDATE_FLOAT);
+        $this->ensure($nota !== false, 'Las calificaciones deben ser números.');
+        $this->ensure($nota >= 0 && $nota <= 10, 'Las calificaciones deben estar entre 0 y 10.');
+        return (float) $nota;
     }
 }

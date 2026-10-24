@@ -1,22 +1,18 @@
 <?php
-/** Entidad EsquemaPago (montos y meses a cobrar de un ciclo escolar). Solo variables. */
-class EsquemaPago
+/**
+ * Model EsquemaPago: los montos y meses que se cobran en un ciclo escolar.
+ * Lo carga EsquemaPago::fromTable() desde sp_esquema_listar, fromRow() desde sp_esquema_obtener y fromForm() desde su formulario.
+ */
+class EsquemaPago extends Model
 {
-    public ?int    $id_esquema        = null;
-    public ?int    $ciclo_id          = null;
-    public ?string $ciclo_nombre      = null;
-    public ?string $nombre            = null;
-    public ?float  $monto_inscripcion = null;
-    public ?float  $monto_colegiatura = null;
-    public ?string $primer_mes        = null;   // Y-m-01
-    public ?int    $num_meses         = null;
-    public ?int    $dia_vencimiento   = null;
-    public ?float  $recargo_monto     = null;   // pesos por cada mes vencido
-
-    public function __construct(array $fila = [])
-    {
-        foreach ($fila as $col => $val) {
-            if (property_exists($this, $col)) $this->$col = $val;
-        }
-    }
+    public ?int    $IdEsquema        = null;
+    public ?int    $IdCiclo          = null;
+    public ?string $CicloNombre      = null;
+    public string  $Nombre           = '';
+    public float   $MontoInscripcion = 0.0;
+    public float   $MontoColegiatura = 0.0;
+    public string  $PrimerMes        = '';     // AAAA-MM-01 (del formulario llega AAAA-MM)
+    public int     $NumMeses         = 0;
+    public int     $DiaVencimiento   = 0;
+    public float   $RecargoMonto     = 0.0;    // pesos por cada mes vencido
 }

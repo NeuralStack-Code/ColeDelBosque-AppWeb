@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de ciclos escolares. La pinta CicloController::index(). Recibe $base. Su JavaScript llama a /ciclo/<método>. */
 $title = 'Ciclo escolar | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -45,11 +43,11 @@ $img = $base . '/webService/wwwroot/img';
         <div class="modal-in">
             <h3 id="modalTitulo">Nuevo ciclo</h3>
             <form id="form">
-                <input type="hidden" id="id_ciclo">
-                <div class="campo"><label>Nombre del ciclo</label><input type="text" id="nombre" placeholder="Ej. 2024-2025" required></div>
+                <input type="hidden" name="IdCiclo">
+                <div class="campo"><label>Nombre del ciclo</label><input type="text" name="Nombre" maxlength="30" placeholder="Ej. 2024-2025" required></div>
                 <div class="fila-2">
-                    <div class="campo"><label>Fecha de inicio</label><input type="date" id="fecha_inicio" required></div>
-                    <div class="campo"><label>Fecha de fin</label><input type="date" id="fecha_fin" required></div>
+                    <div class="campo"><label>Fecha de inicio</label><input type="date" name="FechaInicio" required></div>
+                    <div class="campo"><label>Fecha de fin</label><input type="date" name="FechaFin" required></div>
                 </div>
                 <div class="modal-acciones">
                     <button type="button" class="btn btn-fantasma" onclick="modal.close()">Cancelar</button>
@@ -60,30 +58,29 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/ciclos';
+        const API = window.BASE_URL + '/ciclo';        // cada método del controller es una URL: /ciclo/listar, /ciclo/guardar…
         const filas = document.getElementById('filas'), vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal'), form = document.getElementById('form');
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            const items = d.items || [];
+            const result = await (await fetch(API + '/listar')).json();
+            const items = result.data.items || [];
             filas.innerHTML = '';
             vacio.style.display = items.length ? 'none' : 'block';
             items.forEach(c => {
-                const activo = Number(c.activo) === 1;
-                const estado = activo
+                const estado = c.Activo
                     ? `<span class="badge-estatus pagado">activo</span>`
                     : `<button class="btn btn-fantasma" style="padding:.4em 1em;font-size:.85rem" data-a="activar">Activar</button>`;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><strong>${c.nombre}</strong></td>
-                    <td>${c.fecha_inicio ?? '—'}</td>
-                    <td>${c.fecha_fin ?? '—'}</td>
+                    <td><strong>${c.Nombre}</strong></td>
+                    <td>${c.FechaInicio || '—'}</td>
+                    <td>${c.FechaFin || '—'}</td>
                     <td>${estado}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar" data-a="editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -100,44 +97,36 @@ $img = $base . '/webService/wwwroot/img';
 
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nuevo ciclo';
-            form.reset(); document.getElementById('id_ciclo').value = ''; modal.showModal();
+            form.reset(); form.elements.IdCiclo.value = ''; modal.showModal();
         }
         function abrirEdicion(c) {
             document.getElementById('modalTitulo').textContent = 'Editar ciclo';
-            document.getElementById('id_ciclo').value = c.id_ciclo;
-            document.getElementById('nombre').value = c.nombre;
-            document.getElementById('fecha_inicio').value = c.fecha_inicio;
-            document.getElementById('fecha_fin').value = c.fecha_fin;
+            // Los campos del formulario se llaman como las propiedades del ciclo.
+            for (const campo of ['IdCiclo', 'Nombre', 'FechaInicio', 'FechaFin']) form.elements[campo].value = c[campo];
             modal.showModal();
         }
 
+        // Guardar: con IdCiclo es un cambio; sin él, un alta.
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const id = document.getElementById('id_ciclo').value;
-            const fd = new FormData();
-            fd.append('nombre', document.getElementById('nombre').value);
-            fd.append('fecha_inicio', document.getElementById('fecha_inicio').value);
-            fd.append('fecha_fin', document.getElementById('fecha_fin').value);
-            let accion = 'crear';
-            if (id) { accion = 'editar'; fd.append('id_ciclo', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { modal.close(); cargar(); }
+            const result = await (await fetch(API + '/guardar', { method: 'POST', body: new FormData(form) })).json();
+            window.notifyResponse(result);
+            if (result.success) { modal.close(); cargar(); }
         });
 
         async function activar(c) {
-            if (!await window.confirmar(`¿Activar el ciclo "${c.nombre}"? Se desactivarán los demás.`, { peligro: false, confirmar: 'Activar' })) return;
-            const fd = new FormData(); fd.append('id_ciclo', c.id_ciclo);
-            const d = await (await fetch(API + '?action=activar', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) cargar();
+            if (!await window.confirmar(`¿Activar el ciclo "${c.Nombre}"? Se desactivarán los demás.`, { peligro: false, confirmar: 'Activar' })) return;
+            const fd = new FormData(); fd.append('IdCiclo', c.IdCiclo);
+            const result = await (await fetch(API + '/activar', { method: 'POST', body: fd })).json();
+            window.notifyResponse(result);
+            if (result.success) cargar();
         }
         async function eliminar(c) {
-            if (!await window.confirmar(`¿Eliminar el ciclo "${c.nombre}"?`)) return;
-            const fd = new FormData(); fd.append('id_ciclo', c.id_ciclo);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) cargar();
+            if (!await window.confirmar(`¿Eliminar el ciclo "${c.Nombre}"?`)) return;
+            const fd = new FormData(); fd.append('IdCiclo', c.IdCiclo);
+            const result = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
+            window.notifyResponse(result);
+            if (result.success) cargar();
         }
 
         cargar();

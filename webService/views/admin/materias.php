@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de materias. La pinta MateriaController::index(). Recibe $base. Su JavaScript llama a /materia/<método>. */
 $title = 'Materias | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -52,8 +50,8 @@ $img = $base . '/webService/wwwroot/img';
         <div class="modal-in">
             <h3 id="modalTitulo">Nueva materia</h3>
             <form id="form">
-                <input type="hidden" id="id_materia">
-                <div class="campo"><label>Nombre</label><input type="text" id="nombre" placeholder="Ej. Matemáticas" required></div>
+                <input type="hidden" name="IdMateria">
+                <div class="campo"><label>Nombre</label><input type="text" name="Nombre" maxlength="25" placeholder="Ej. Matemáticas" required></div>
                 <div class="campo">
                     <label>Grupos donde se imparte</label>
                     <div class="lista-check" id="gruposCheck"></div>
@@ -68,8 +66,8 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/materias';
-        const APIG = window.BASE_URL + '/api/control-escolar';
+        const API = window.BASE_URL + '/materia';       // cada método del controller es una URL: /materia/listar…
+        const APIG = window.BASE_URL + '/grupo';
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
@@ -77,15 +75,15 @@ $img = $base . '/webService/wwwroot/img';
         let todos = [], grupos = [];
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargarGrupos() {
-            const d = await (await fetch(APIG + '?action=grupos_listar')).json();
-            grupos = d.items || [];
+            const d = await (await fetch(APIG + '/listar')).json();
+            grupos = d.data?.items || [];
             document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' +
-                grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
+                grupos.map(g => `<option value="${g.IdGrupo}">${g.Grado}</option>`).join('');
         }
 
         function pintarChecklist(seleccionados = []) {
@@ -94,17 +92,13 @@ $img = $base . '/webService/wwwroot/img';
             document.getElementById('sinGrupos').style.display = grupos.length ? 'none' : 'block';
             cont.innerHTML = grupos.map(g => `
                 <label>
-                    <input type="checkbox" value="${g.id_grupo}" ${sel.has(Number(g.id_grupo)) ? 'checked' : ''}>
-                    <span>${g.grado}${g.ciclo_nombre ? ' · ' + g.ciclo_nombre : ''}</span>
+                    <input type="checkbox" name="Grupos[]" value="${g.IdGrupo}" ${sel.has(Number(g.IdGrupo)) ? 'checked' : ''}>
+                    <span>${g.Grado}${g.CicloNombre ? ' · ' + g.CicloNombre : ''}</span>
                 </label>`).join('');
         }
-        function gruposMarcados() {
-            return [...document.querySelectorAll('#gruposCheck input:checked')].map(c => Number(c.value));
-        }
-
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            todos = d.items || [];
+            const result = await (await fetch(API + '/listar')).json();
+            todos = result.data.items || [];
             render();
         }
 
@@ -112,18 +106,18 @@ $img = $base . '/webService/wwwroot/img';
             const q = document.getElementById('fBuscar').value.toLowerCase();
             const grp = document.getElementById('fGrupo').value;
             const f = todos.filter(m => {
-                if (q && !(m.nombre || '').toLowerCase().includes(q)) return false;
-                if (grp && !(m.grupo_ids || []).includes(Number(grp))) return false;
+                if (q && !(m.Nombre || '').toLowerCase().includes(q)) return false;
+                if (grp && !(m.GrupoIds || []).includes(Number(grp))) return false;
                 return true;
             });
             filas.innerHTML = '';
             vacio.style.display = f.length ? 'none' : 'block';
             f.forEach(m => {
-                const chips = (m.grupos_txt || '').split(', ').filter(Boolean)
+                const chips = (m.GruposTxt || '').split(', ').filter(Boolean)
                     .map(g => `<span class="chip">${g}</span>`).join(' ') || '<span class="pill-sin">Sin grupos</span>';
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><strong>${m.nombre}</strong></td>
+                    <td><strong>${m.Nombre}</strong></td>
                     <td><div class="chips">${chips}</div></td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -138,37 +132,33 @@ $img = $base . '/webService/wwwroot/img';
 
         function abrirAlta() {
             document.getElementById('modalTitulo').textContent = 'Nueva materia';
-            form.reset(); document.getElementById('id_materia').value = '';
+            form.reset(); form.elements.IdMateria.value = '';
             pintarChecklist([]);
             modal.showModal();
         }
+
         function abrirEdicion(m) {
             document.getElementById('modalTitulo').textContent = 'Editar materia';
-            document.getElementById('id_materia').value = m.id_materia;
-            document.getElementById('nombre').value = m.nombre;
-            pintarChecklist(m.grupo_ids || []);
+            form.elements.IdMateria.value = m.IdMateria;
+            form.elements.Nombre.value = m.Nombre;
+            pintarChecklist(m.GrupoIds || []);
             modal.showModal();
         }
 
+        // Guardar: con IdMateria es un cambio; sin ella, un alta. Los grupos marcados viajan como Grupos[].
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const id = document.getElementById('id_materia').value;
-            const fd = new FormData();
-            fd.append('nombre', document.getElementById('nombre').value);
-            fd.append('grupos', JSON.stringify(gruposMarcados()));
-            let accion = 'crear';
-            if (id) { accion = 'editar'; fd.append('id_materia', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) { modal.close(); cargar(); }
+            const result = await (await fetch(API + '/guardar', { method: 'POST', body: new FormData(form) })).json();
+            window.notifyResponse(result);
+            if (result.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(m) {
-            if (!await window.confirmar(`¿Eliminar la materia "${m.nombre}"? Se quitará de todos sus grupos.`)) return;
-            const fd = new FormData(); fd.append('id_materia', m.id_materia);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
-            window.notifyResponse(d);
-            if (d.success) cargar();
+            if (!await window.confirmar(`¿Eliminar la materia "${m.Nombre}"? Se quitará de todos sus grupos.`)) return;
+            const fd = new FormData(); fd.append('IdMateria', m.IdMateria);
+            const result = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
+            window.notifyResponse(result);
+            if (result.success) cargar();
         }
 
         (async () => { await cargarGrupos(); cargar(); })();

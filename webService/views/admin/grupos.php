@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de grupos. La pinta GrupoController::index(). Recibe $base. Su JavaScript llama a /grupo/<método>. */
 $title = 'Grupos | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -91,7 +89,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/control-escolar';
+        const API = window.BASE_URL + '/grupo';
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
@@ -102,49 +100,49 @@ $img = $base . '/webService/wwwroot/img';
         let catalogoMaterias = [];      // {id_materia, nombre} catálogo completo
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         let ciclos = [], cicloActivo = '';
 
         async function cargarCiclos() {
-            const d = await (await fetch(window.BASE_URL + '/api/ciclos?action=listar')).json();
-            ciclos = d.items || [];
-            const act = ciclos.find(c => Number(c.activo) === 1);
-            cicloActivo = act ? String(act.id_ciclo) : '';
-            const opts = ciclos.map(c => `<option value="${c.id_ciclo}">${c.nombre}${Number(c.activo) === 1 ? ' (activo)' : ''}</option>`).join('');
+            const result = await (await fetch(window.BASE_URL + '/ciclo/listar')).json();
+            ciclos = result.data.items || [];
+            const act = ciclos.find(c => c.Activo);
+            cicloActivo = act ? String(act.IdCiclo) : '';
+            const opts = ciclos.map(c => `<option value="${c.IdCiclo}">${c.Nombre}${c.Activo ? ' (activo)' : ''}</option>`).join('');
             document.getElementById('fCiclo').innerHTML = '<option value="">Todos los ciclos</option>' + opts;
             document.getElementById('ciclo_id').innerHTML = '<option value="">Sin ciclo</option>' + opts;
         }
 
         async function cargar() {
             const fc = document.getElementById('fCiclo').value;
-            const r = await fetch(API + '?action=grupos_listar' + (fc ? '&ciclo_id=' + fc : ''));
+            const r = await fetch(API + '/listar' + (fc ? '?IdCiclo=' + fc : ''));
             const d = await r.json();
-            const items = d.items || [];
+            const items = d.data?.items || [];
             filas.innerHTML = '';
             vacio.style.display = items.length ? 'none' : 'block';
             items.forEach(g => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><strong>${g.grado}</strong></td>
-                    <td>${g.ciclo_nombre ?? '—'}</td>
-                    <td>${g.nivel ?? '—'}</td>
-                    <td>${g.num_materias} materia(s)</td>
+                    <td><strong>${g.Grado}</strong></td>
+                    <td>${g.CicloNombre ?? '—'}</td>
+                    <td>${g.Nivel ?? '—'}</td>
+                    <td>${g.NumMaterias} materia(s)</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
                     </div></td>`;
-                tr.querySelector('.editar').addEventListener('click', () => abrirEdicion(g.id_grupo));
+                tr.querySelector('.editar').addEventListener('click', () => abrirEdicion(g.IdGrupo));
                 tr.querySelector('.borrar').addEventListener('click', () => eliminar(g));
                 filas.appendChild(tr);
             });
         }
 
         async function cargarCatalogo() {
-            const d = await (await fetch(window.BASE_URL + '/api/materias?action=listar')).json();
-            catalogoMaterias = (d.items || []).map(m => ({ id_materia: m.id_materia, nombre: m.nombre }));
+            const result = await (await fetch(window.BASE_URL + '/materia/listar')).json();
+            catalogoMaterias = (result.data.items || []).map(m => ({ id_materia: m.IdMateria, nombre: m.Nombre }));
         }
 
         function pintarChecklist(seleccionados = []) {
@@ -199,22 +197,22 @@ $img = $base . '/webService/wwwroot/img';
             reset();
             document.getElementById('modalTitulo').textContent = 'Editar grupo';
             document.getElementById('id_grupo').value = id;
-            const r = await fetch(API + '?action=grupo_detalle&id_grupo=' + id);
-            const d = await r.json();
-            if (!d.success) { window.notify('error', d.message); return; }
-            document.getElementById('grado').value = d.grupo.grado;
-            document.getElementById('ciclo_id').value = d.grupo.ciclo_id ?? '';
-            document.getElementById('nivel').value = d.grupo.nivel ?? '';
-            document.getElementById('nivel_ingles').value = d.grupo.nivel_ingles ?? '';
-            catalogoMaterias = (d.catalogo || catalogoMaterias);
+            const r = await fetch(API + '/detalle?IdGrupo=' + id);
+            const res = await r.json();
+            if (!res.success) { window.notify('error', res.message); return; }
+            const d = res.data;
+            document.getElementById('grado').value = d.grupo.Grado;
+            document.getElementById('ciclo_id').value = d.grupo.IdCiclo ?? '';
+            document.getElementById('nivel').value = d.grupo.Nivel ?? '';
+            document.getElementById('nivel_ingles').value = d.grupo.NivelIngles ?? '';
             materiasNuevas = [];
-            pintarChecklist((d.materias || []).map(m => m.id_materia));
+            pintarChecklist((d.materias || []).map(m => m.IdMateria));
             pintarChipsNuevas();
             // maestra select
             const sel = document.getElementById('maestra');
             sel.innerHTML = '<option value="">Sin asignar</option>' +
-                d.maestros.map(m => `<option value="${m.id_cuenta}">${m.nombre}</option>`).join('');
-            sel.value = d.grupo.maestra_id ?? '';
+                d.maestros.map(m => `<option value="${m.IdCuenta}">${m.Nombre}</option>`).join('');
+            sel.value = d.grupo.IdMaestra ?? '';
             document.getElementById('campoMaestra').style.display = 'block';
             modal.showModal();
         }
@@ -223,37 +221,32 @@ $img = $base . '/webService/wwwroot/img';
             e.preventDefault();
             const id = document.getElementById('id_grupo').value;
             const fd = new FormData();
-            fd.append('ciclo_id', document.getElementById('ciclo_id').value);
-            fd.append('nivel', document.getElementById('nivel').value);
-            fd.append('nivel_ingles', document.getElementById('nivel_ingles').value);
-            fd.append('materia_ids', JSON.stringify(materiasMarcadas()));
-            fd.append('materias_nuevas', JSON.stringify(materiasNuevas));
+            // Cada campo viaja con el nombre de la propiedad del model Grupo; las materias, como Materias[] y MateriasNuevas[]
+            fd.append('IdCiclo', document.getElementById('ciclo_id').value);
+            fd.append('Nivel', document.getElementById('nivel').value);
+            fd.append('NivelIngles', document.getElementById('nivel_ingles').value);
+            fd.append('Grado', document.getElementById('grado').value);
+            materiasMarcadas().forEach(m => fd.append('Materias[]', m));
+            materiasNuevas.forEach(m => fd.append('MateriasNuevas[]', m));
             if (id) {
-                fd.append('id_grupo', id);
-                fd.append('grado', document.getElementById('grado').value);
-                fd.append('maestra_id', document.getElementById('maestra').value);
-                const r = await fetch(API + '?action=grupo_editar', { method: 'POST', body: fd });
-                const d = await r.json();
-                window.notifyResponse(d);
-                if (d.success) { modal.close(); cargar(); }
-            } else {
-                fd.append('grado', document.getElementById('grado').value);
-                const r = await fetch(API + '?action=grupo_crear', { method: 'POST', body: fd });
-                const d = await r.json();
-                window.notifyResponse(d);
-                if (d.success) { modal.close(); cargar(); }
+                fd.append('IdGrupo', id);
+                fd.append('IdMaestra', document.getElementById('maestra').value);
             }
+            const r = await fetch(API + '/guardar', { method: 'POST', body: fd });
+            const d = await r.json();
+            window.notifyResponse(d);
+            if (d.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(g) {
-            const n = Number(g.num_alumnos || 0);
+            const n = Number(g.NumAlumnos || 0);
             const aviso = n > 0
-                ? `¿Eliminar el grupo "${g.grado}"? Sus ${n} alumno(s) quedarán en «Sin grupo» hasta que los reasignes.`
-                : `¿Eliminar el grupo "${g.grado}"? Las materias del catálogo no se borran.`;
+                ? `¿Eliminar el grupo "${g.Grado}"? Sus ${n} alumno(s) quedarán en «Sin grupo» hasta que los reasignes.`
+                : `¿Eliminar el grupo "${g.Grado}"? Las materias del catálogo no se borran.`;
             if (!await window.confirmar(aviso)) return;
             const fd = new FormData();
-            fd.append('id_grupo', g.id_grupo);
-            const r = await fetch(API + '?action=grupo_eliminar', { method: 'POST', body: fd });
+            fd.append('IdGrupo', g.IdGrupo);
+            const r = await fetch(API + '/eliminar', { method: 'POST', body: fd });
             const d = await r.json();
             window.notifyResponse(d);
             if (d.success) cargar();

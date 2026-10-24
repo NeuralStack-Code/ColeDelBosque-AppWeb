@@ -1,104 +1,45 @@
 <?php
-
 /**
- * Catálogo de materias. Una materia puede estar en VARIOS grupos (grupo_materia).
- * Aquí vive TODO el SQL, incluida la sincronización del muchos-a-muchos.
+ * Entidad Materia: el catálogo de materias y los grupos donde se imparten (tablas materia + grupo_materia).
+ * Procedures: webService/sql/sp/sp_materia.sql.
  */
-class MateriaBusiness
+class MateriaBusiness extends Entity
 {
-    private mysqli $db;
+    public ?int   $IdMateria = null;
+    public string $Nombre    = '';
+    public string $Grupos    = '';   // ids de sus grupos separados por coma: "69,70,71"
 
-    public function __construct(mysqli $db)
+    /** Cada materia con sus grupos. */
+    public function list(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_materia_listar');
+        return $this->db->execute();
     }
 
-    /** @return Materia[] */
-    public function listar(): array
+    /** Alta con sus grupos. Regresa el Id nuevo; 'dup' si ya hay una con ese nombre. */
+    public function insert(): array
     {
-        $sql = 'SELECT m.id_materia, m.nombre,
-                       (SELECT GROUP_CONCAT(g.grado ORDER BY g.grado SEPARATOR ", ")
-                          FROM grupo_materia gm JOIN grupo g ON g.id_grupo = gm.id_grupo
-                          WHERE gm.id_materia = m.id_materia) AS grupos_txt,
-                       (SELECT GROUP_CONCAT(gm.id_grupo)
-                          FROM grupo_materia gm WHERE gm.id_materia = m.id_materia) AS grupo_ids,
-                       (SELECT COUNT(*) FROM grupo_materia gm WHERE gm.id_materia = m.id_materia) AS num_grupos
-                FROM materia m ORDER BY m.nombre';
-        $res = mysqli_query($this->db, $sql);
-        $items = [];
-        while ($r = mysqli_fetch_assoc($res)) {
-            $r['grupo_ids'] = $r['grupo_ids'] ? array_map('intval', explode(',', $r['grupo_ids'])) : [];
-            $items[] = new Materia($r);
-        }
-        return $items;
+        $this->db->command('sp_materia_crear');
+        $this->db->addParameter('Nombre', $this->Nombre);
+        $this->db->addParameter('Grupos', $this->Grupos);
+        return $this->db->execute();
     }
 
-    /** ¿Existe otra materia con el mismo nombre? */
-    public function nombreDuplicado(string $nombre, int $exceptoId = 0): bool
+    /** Cambia el nombre y deja la materia exactamente en esos grupos. 'notfound' · 'dup'. */
+    public function update(): array
     {
-        $q = mysqli_prepare($this->db, 'SELECT 1 FROM materia WHERE nombre = ? AND id_materia <> ? LIMIT 1');
-        mysqli_stmt_bind_param($q, 'si', $nombre, $exceptoId);
-        mysqli_stmt_execute($q);
-        $dup = (bool) mysqli_fetch_row(mysqli_stmt_get_result($q));
-        mysqli_stmt_close($q);
-        return $dup;
+        $this->db->command('sp_materia_editar');
+        $this->db->addParameter('IdMateria', $this->IdMateria);
+        $this->db->addParameter('Nombre',    $this->Nombre);
+        $this->db->addParameter('Grupos',    $this->Grupos);
+        return $this->db->execute();
     }
 
-    /** Crea la materia; regresa su id (0 = falló). */
-    public function crear(string $nombre): int
+    /** Regresa las filas afectadas; 'en_uso' si ya tiene calificaciones. */
+    public function delete(): array
     {
-        $stmt = mysqli_prepare($this->db, 'INSERT INTO materia (nombre) VALUES (?)');
-        mysqli_stmt_bind_param($stmt, 's', $nombre);
-        $ok = mysqli_stmt_execute($stmt);
-        $id = $ok ? mysqli_insert_id($this->db) : 0;
-        mysqli_stmt_close($stmt);
-        return $id;
-    }
-
-    public function editar(int $id, string $nombre): bool
-    {
-        $stmt = mysqli_prepare($this->db, 'UPDATE materia SET nombre = ? WHERE id_materia = ?');
-        mysqli_stmt_bind_param($stmt, 'si', $nombre, $id);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
-    }
-
-    /** Deja la materia vinculada EXACTAMENTE a los grupos dados. */
-    public function sincronizarGrupos(int $materiaId, array $grupoIds): void
-    {
-        $grupoIds = array_values(array_unique(array_filter(array_map('intval', $grupoIds), fn($x) => $x > 0)));
-        if ($grupoIds) {
-            $in = implode(',', $grupoIds);
-            mysqli_query($this->db, "DELETE FROM grupo_materia WHERE id_materia = $materiaId AND id_grupo NOT IN ($in)");
-        } else {
-            mysqli_query($this->db, "DELETE FROM grupo_materia WHERE id_materia = $materiaId");
-        }
-        $ins = mysqli_prepare($this->db, 'INSERT IGNORE INTO grupo_materia (id_grupo, id_materia) VALUES (?, ?)');
-        foreach ($grupoIds as $gid) {
-            mysqli_stmt_bind_param($ins, 'ii', $gid, $materiaId);
-            mysqli_stmt_execute($ins);
-        }
-        mysqli_stmt_close($ins);
-    }
-
-    /** ¿La materia tiene calificaciones registradas? */
-    public function tieneCalificaciones(int $id): bool
-    {
-        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM calificacion WHERE materia_id = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 'i', $id);
-        mysqli_stmt_execute($chk);
-        $hay = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
-        mysqli_stmt_close($chk);
-        return $hay;
-    }
-
-    /** Los vínculos en grupo_materia se borran por la FK en cascada. */
-    public function eliminar(int $id): void
-    {
-        $stmt = mysqli_prepare($this->db, 'DELETE FROM materia WHERE id_materia = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
+        $this->db->command('sp_materia_eliminar');
+        $this->db->addParameter('IdMateria', $this->IdMateria);
+        return $this->db->execute();
     }
 }

@@ -1,158 +1,95 @@
 <?php
-require_once dirname(__DIR__, 3) . '/apiService/core/crypto.php';
-
 /**
- * Esquemas de pago por ciclo escolar (tabla esquema_pago) y los catálogos que
- * necesita su panel. Aquí vive el SQL. Generar las colegiaturas lo hace
- * ColegiaturaBusiness::generarEsquema().
+ * Entidad EsquemaPago: lo que se cobra en un ciclo escolar (tabla esquema_pago) y a quiénes se aplica.
+ * Generar los pagos lo hace la entidad Colegiatura (Generate). Procedures: webService/sql/sp/sp_esquema_pago.sql.
  */
-class EsquemaPagoBusiness
+class EsquemaPagoBusiness extends Entity
 {
-    private mysqli $db;
+    public ?int    $IdEsquema        = null;
+    public ?int    $IdCiclo          = null;
+    public string  $Nombre           = '';
+    public float   $MontoInscripcion = 0.0;
+    public float   $MontoColegiatura = 0.0;
+    public string  $PrimerMes        = '';   // AAAA-MM-01
+    public int     $NumMeses         = 0;
+    public int     $DiaVencimiento   = 0;
+    public float   $RecargoMonto     = 0.0;
+    public string  $AplicarA         = 'todos';   // todos · grupo · alumno
+    public ?int    $IdGrupo          = null;
+    public ?int    $IdCuenta         = null;
 
-    public function __construct(mysqli $db)
+    public function list(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_esquema_listar');
+        return $this->db->execute();
     }
 
-    /** @return EsquemaPago[] */
-    public function listar(): array
+    /** Un esquema (tabla vacía si no existe). */
+    public function get(): array
     {
-        $res = mysqli_query($this->db,
-            'SELECT e.id_esquema, e.ciclo_id, c.nombre AS ciclo_nombre, e.nombre, e.monto_inscripcion, e.monto_colegiatura,
-                    e.primer_mes, e.num_meses, e.dia_vencimiento, e.recargo_monto
-             FROM esquema_pago e JOIN ciclo c ON c.id_ciclo = e.ciclo_id
-             ORDER BY c.fecha_inicio DESC, e.nombre');
-        $items = [];
-        while ($r = mysqli_fetch_assoc($res)) $items[] = new EsquemaPago($r);
-        return $items;
+        $this->db->command('sp_esquema_obtener');
+        $this->db->addParameter('IdEsquema', $this->IdEsquema);
+        return $this->db->execute();
     }
 
-    public function obtener(int $id): ?EsquemaPago
+    /** Regresa el Id nuevo. */
+    public function insert(): array
     {
-        $stmt = mysqli_prepare($this->db,
-            'SELECT id_esquema, ciclo_id, nombre, monto_inscripcion, monto_colegiatura, primer_mes, num_meses, dia_vencimiento, recargo_monto
-             FROM esquema_pago WHERE id_esquema = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-        mysqli_stmt_close($stmt);
-        return $row ? new EsquemaPago($row) : null;
+        $this->db->command('sp_esquema_crear');
+        $this->fields();
+        return $this->db->execute();
     }
 
-    public function crear(EsquemaPago $e): bool
+    /** 'notfound' si no existe. */
+    public function update(): array
     {
-        $stmt = mysqli_prepare($this->db,
-            'INSERT INTO esquema_pago (ciclo_id, nombre, monto_inscripcion, monto_colegiatura, primer_mes, num_meses, dia_vencimiento, recargo_monto)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'isddsiid', $e->ciclo_id, $e->nombre, $e->monto_inscripcion, $e->monto_colegiatura,
-            $e->primer_mes, $e->num_meses, $e->dia_vencimiento, $e->recargo_monto);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_esquema_editar');
+        $this->db->addParameter('IdEsquema', $this->IdEsquema);
+        $this->fields();
+        return $this->db->execute();
     }
 
-    public function editar(EsquemaPago $e): bool
+    /** Regresa las filas afectadas (0 = no existía). */
+    public function delete(): array
     {
-        $stmt = mysqli_prepare($this->db,
-            'UPDATE esquema_pago SET ciclo_id = ?, nombre = ?, monto_inscripcion = ?, monto_colegiatura = ?, primer_mes = ?,
-                    num_meses = ?, dia_vencimiento = ?, recargo_monto = ?
-             WHERE id_esquema = ?');
-        mysqli_stmt_bind_param($stmt, 'isddsiidi', $e->ciclo_id, $e->nombre, $e->monto_inscripcion, $e->monto_colegiatura,
-            $e->primer_mes, $e->num_meses, $e->dia_vencimiento, $e->recargo_monto, $e->id_esquema);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_esquema_eliminar');
+        $this->db->addParameter('IdEsquema', $this->IdEsquema);
+        return $this->db->execute();
     }
 
-    /** @return int filas afectadas (0 = no existía). No toca las colegiaturas ya generadas. */
-    public function eliminar(int $id): int
+    public function groups(): array
     {
-        $stmt = mysqli_prepare($this->db, 'DELETE FROM esquema_pago WHERE id_esquema = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        $af = mysqli_stmt_affected_rows($stmt);
-        mysqli_stmt_close($stmt);
-        return $af;
+        $this->db->command('sp_esquema_grupos');
+        return $this->db->execute();
     }
 
-    /** Fechas del ciclo (o null si no existe). */
-    public function ciclo(int $id): ?array
+    public function students(): array
     {
-        $stmt = mysqli_prepare($this->db, 'SELECT id_ciclo, nombre, fecha_inicio, fecha_fin FROM ciclo WHERE id_ciclo = ? LIMIT 1');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        $row = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
-        mysqli_stmt_close($stmt);
-        return $row ?: null;
+        $this->db->command('sp_esquema_alumnos');
+        return $this->db->execute();
     }
 
-    public function ciclos(): array
+    /** Los IdCuenta a quienes se aplica. 'invalido' (grupo de otro ciclo) · 'notfound' (alumno fuera del ciclo). */
+    public function recipients(): array
     {
-        $res = mysqli_query($this->db,
-            'SELECT c.id_ciclo, c.nombre, c.fecha_inicio, c.fecha_fin, (s.clave = "activo") AS activo
-             FROM ciclo c LEFT JOIN status s ON s.id_status = c.status_id
-             ORDER BY c.fecha_inicio DESC');
-        $ciclos = [];
-        while ($r = mysqli_fetch_assoc($res)) $ciclos[] = $r;
-        return $ciclos;
+        $this->db->command('sp_esquema_destinatarios');
+        $this->db->addParameter('IdCiclo',  $this->IdCiclo);
+        $this->db->addParameter('AplicarA', $this->AplicarA);
+        $this->db->addParameter('IdGrupo',  $this->IdGrupo);
+        $this->db->addParameter('IdCuenta', $this->IdCuenta);
+        return $this->db->execute();
     }
 
-    /** Grupos con su ciclo (para elegir a quién aplicar). */
-    public function grupos(): array
+    /** Los campos del esquema, iguales en el alta y en el cambio. */
+    private function fields(): void
     {
-        $res = mysqli_query($this->db,
-            'SELECT id_grupo, grado, ciclo_id FROM grupo WHERE id_grupo <> 0 AND ciclo_id IS NOT NULL ORDER BY nivel, grado');
-        $grupos = [];
-        while ($r = mysqli_fetch_assoc($res)) $grupos[] = $r;
-        return $grupos;
-    }
-
-    /** Alumnos con su grupo y ciclo (para elegir a quién aplicar); matrícula desencriptada. */
-    public function alumnos(): array
-    {
-        $res = mysqli_query($this->db,
-            'SELECT c.id_cuenta, c.matricula, c.grupo_id, g.grado, g.ciclo_id, u.nombre, u.paterno, u.materno
-             FROM cuenta c
-             JOIN usuario u ON u.id_usuario = c.usuario_id
-             JOIN grupo g   ON g.id_grupo = c.grupo_id
-             WHERE c.permiso_id = 3 AND g.ciclo_id IS NOT NULL
-             ORDER BY u.paterno, u.nombre');
-        $alumnos = [];
-        while ($r = mysqli_fetch_assoc($res)) {
-            $alumnos[] = [
-                'id_cuenta' => $r['id_cuenta'],
-                'nombre'    => trim("$r[nombre] $r[paterno] $r[materno]"),
-                'matricula' => decrypt($r['matricula']),
-                'grupo_id'  => $r['grupo_id'],
-                'grado'     => $r['grado'],
-                'ciclo_id'  => $r['ciclo_id'],
-            ];
-        }
-        return $alumnos;
-    }
-
-    /** ¿El grupo pertenece al ciclo? */
-    public function grupoEnCiclo(int $grupoId, int $cicloId): bool
-    {
-        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM grupo WHERE id_grupo = ? AND ciclo_id = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 'ii', $grupoId, $cicloId);
-        mysqli_stmt_execute($chk);
-        $ok = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
-        mysqli_stmt_close($chk);
-        return $ok;
-    }
-
-    /** @return int[] id_cuenta de los alumnos del grupo. */
-    public function alumnosDeGrupo(int $grupoId): array
-    {
-        $stmt = mysqli_prepare($this->db, 'SELECT id_cuenta FROM cuenta WHERE grupo_id = ? AND permiso_id = 3');
-        mysqli_stmt_bind_param($stmt, 'i', $grupoId);
-        mysqli_stmt_execute($stmt);
-        $res = mysqli_stmt_get_result($stmt);
-        $ids = [];
-        while ($r = mysqli_fetch_row($res)) $ids[] = (int) $r[0];
-        mysqli_stmt_close($stmt);
-        return $ids;
+        $this->db->addParameter('IdCiclo',          $this->IdCiclo);
+        $this->db->addParameter('Nombre',           $this->Nombre);
+        $this->db->addParameter('MontoInscripcion', $this->MontoInscripcion);
+        $this->db->addParameter('MontoColegiatura', $this->MontoColegiatura);
+        $this->db->addParameter('PrimerMes',        $this->PrimerMes);
+        $this->db->addParameter('NumMeses',         $this->NumMeses);
+        $this->db->addParameter('DiaVencimiento',   $this->DiaVencimiento);
+        $this->db->addParameter('RecargoMonto',     $this->RecargoMonto);
     }
 }

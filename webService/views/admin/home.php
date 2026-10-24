@@ -1,12 +1,8 @@
 <?php
-$rol = 1; // solo admin
-require __DIR__ . '/../partials/guard.php';
-
-$base     = BASE_URL;
+/** Panel del administrador. Lo pinta DashboardController::index(). Recibe $nombre (quien está en sesión) y $base. Sus números los pide a /dashboard/resumen. */
 $title    = 'Panel de administración | Colegio del Bosque';
 $extraCss = ['admin.css'];
 $img      = $base . '/webService/wwwroot/img';
-$nombre   = $_SESSION['usuario'] ?? 'Administrador';
 
 // Separador de onda reutilizable
 function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
@@ -22,7 +18,7 @@ function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
     <!-- Topbar -->
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -79,42 +75,42 @@ function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
     <h3 class="admin-seccion-tit">Accesos</h3>
     <div class="accesos-lista">
         <div class="acceso-panel">
-            <a class="acceso" href="<?= $base ?>/administrador/alumnos">
+            <a class="acceso" href="<?= $base ?>/alumno/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg></span>
                 <span class="a-txt"><strong>Alumnos</strong><span>Altas, edición y bajas</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/maestros">
+            <a class="acceso" href="<?= $base ?>/docente/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c3 2.5 9 2.5 12 0v-5"/></svg></span>
                 <span class="a-txt"><strong>Maestros</strong><span>Altas, edición y bajas</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/grupos">
+            <a class="acceso" href="<?= $base ?>/grupo/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
                 <span class="a-txt"><strong>Grupos</strong><span>Grupos, materias y maestra</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/materias">
+            <a class="acceso" href="<?= $base ?>/materia/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg></span>
                 <span class="a-txt"><strong>Materias</strong><span>Catálogo de materias</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/recibos">
+            <a class="acceso" href="<?= $base ?>/recibo/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></span>
                 <span class="a-txt"><strong>Finanzas</strong><span>Recibos: ingresos y egresos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/colegiaturas">
+            <a class="acceso" href="<?= $base ?>/colegiatura/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg></span>
                 <span class="a-txt"><strong>Colegiaturas</strong><span>Registro y estatus de pagos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/ciclos">
+            <a class="acceso" href="<?= $base ?>/ciclo/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
                 <span class="a-txt"><strong>Ciclo escolar</strong><span>Ciclos y periodos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
-            <a class="acceso" href="<?= $base ?>/administrador/reporte-columnas">
+            <a class="acceso" href="<?= $base ?>/reportecolumna/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
                 <span class="a-txt"><strong>Reporte semanal</strong><span>Columnas que capturan las maestras</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
@@ -124,39 +120,40 @@ function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
 
     <script>
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         (async function dashboard() {
-            let d;
-            try { d = await (await fetch(window.BASE_URL + '/api/dashboard?action=resumen')).json(); }
+            let result;
+            try { result = await (await fetch(window.BASE_URL + '/dashboard/resumen')).json(); }
             catch { return; }
-            if (!d.success) return;
+            if (!result.success) return;
+            const d = result.data.resumen;
             const money = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
 
-            document.getElementById('m-alumnos').textContent = d.alumnos;
-            document.getElementById('m-maestros').textContent = d.maestros;
-            document.getElementById('m-grupos').textContent = d.grupos;
-            document.getElementById('m-saldo').textContent = money(d.saldo);
-            document.getElementById('m-pend').textContent = d.pagos_pendientes;
+            document.getElementById('m-alumnos').textContent = d.Alumnos;
+            document.getElementById('m-maestros').textContent = d.Maestros;
+            document.getElementById('m-grupos').textContent = d.Grupos;
+            document.getElementById('m-saldo').textContent = money(d.Saldo);
+            document.getElementById('m-pend').textContent = d.PagosPendientes;
 
             // Barras: alumnos por grupo
             const cont = document.getElementById('chartGrupos');
-            const grupos = d.alumnos_por_grupo || [];
+            const grupos = result.data.alumnosPorGrupo || [];
             if (!grupos.length) { cont.innerHTML = '<div class="dash-empty">Sin grupos registrados.</div>'; }
             else {
-                const max = Math.max(...grupos.map(g => g.total), 1);
+                const max = Math.max(...grupos.map(g => g.Total), 1);
                 cont.innerHTML = grupos.map(g => `
                     <div class="dash-bar">
-                        <div class="val">${g.total}</div>
-                        <div class="barra" style="height:${(g.total / max) * 140 + 4}px"></div>
-                        <div class="lbl">${g.grado}</div>
+                        <div class="val">${g.Total}</div>
+                        <div class="barra" style="height:${(g.Total / max) * 140 + 4}px"></div>
+                        <div class="lbl">${g.Grado}</div>
                     </div>`).join('');
             }
 
             // Donut: colegiaturas
-            const pag = d.pagos_pagados || 0, pend = d.pagos_pendientes || 0, tot = pag + pend;
+            const pag = d.PagosPagados || 0, pend = d.PagosPendientes || 0, tot = pag + pend;
             const donut = document.getElementById('donut');
             const pct = tot ? Math.round(pag / tot * 100) : 0;
             donut.style.background = tot

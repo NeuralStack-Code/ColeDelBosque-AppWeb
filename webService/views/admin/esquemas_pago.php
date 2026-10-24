@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de esquemas de pago. La pinta EsquemaPagoController::index(). Recibe $base. Su JavaScript llama a /esquemapago/<método>. */
 $title = 'Esquemas de pago | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador/colegiaturas">
+    <a class="volver-panel" href="<?= $base ?>/colegiatura/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Volver a colegiaturas
     </a>
@@ -112,7 +110,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/esquemas-pago';
+        const API = window.BASE_URL + '/esquemapago';
         const MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
         const money = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -125,18 +123,18 @@ $img = $base . '/webService/wwwroot/img';
         let porAplicar = null;
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         /* ---------- Meses del ciclo ---------- */
 
         // 'Y-m' de cada mes entre el inicio y el fin del ciclo
         function mesesDelCiclo(cicloId) {
-            const c = ciclos.find(x => String(x.id_ciclo) === String(cicloId));
-            if (!c || !c.fecha_inicio || !c.fecha_fin) return [];
-            let [a, m] = c.fecha_inicio.split('-').map(Number);
-            const [af, mf] = c.fecha_fin.split('-').map(Number);
+            const c = ciclos.find(x => String(x.IdCiclo) === String(cicloId));
+            if (!c || !c.FechaInicio || !c.FechaFin) return [];
+            let [a, m] = c.FechaInicio.split('-').map(Number);
+            const [af, mf] = c.FechaFin.split('-').map(Number);
             const out = [];
             while (a < af || (a === af && m <= mf)) {
                 out.push(`${a}-${String(m).padStart(2, '0')}`);
@@ -183,38 +181,39 @@ $img = $base . '/webService/wwwroot/img';
         /* ---------- Listado ---------- */
 
         async function cargarCatalogos() {
-            const d = await (await fetch(API + '?action=catalogos')).json();
-            if (!d.success) { window.notify('error', d.message); return; }
+            const r = await (await fetch(API + '/catalogos')).json();
+            if (!r.success) { window.notify('error', r.message); return; }
+            const d = r.data;
             ciclos = d.ciclos || []; grupos = d.grupos || []; alumnos = d.alumnos || [];
-            const opts = ciclos.map(c => `<option value="${c.id_ciclo}">${esc(c.nombre)}${Number(c.activo) ? ' (activo)' : ''}</option>`).join('');
+            const opts = ciclos.map(c => `<option value="${c.IdCiclo}">${esc(c.Nombre)}${Number(c.Activo) ? ' (activo)' : ''}</option>`).join('');
             fCiclo.innerHTML = '<option value="">Todos</option>' + opts;
             selCiclo.innerHTML = opts;
-            const activo = ciclos.find(c => Number(c.activo));
-            if (activo) fCiclo.value = activo.id_ciclo;
+            const activo = ciclos.find(c => Number(c.Activo));
+            if (activo) fCiclo.value = activo.IdCiclo;
         }
 
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
+            const d = await (await fetch(API + '/listar')).json();
             if (!d.success) { window.notify('error', d.message); return; }
-            esquemas = d.items || [];
+            esquemas = d.data.items || [];
             render();
         }
 
         function render() {
-            const f = esquemas.filter(e => !fCiclo.value || String(e.ciclo_id) === fCiclo.value);
+            const f = esquemas.filter(e => !fCiclo.value || String(e.IdCiclo) === fCiclo.value);
             filas.innerHTML = '';
             vacio.style.display = f.length ? 'none' : 'block';
             f.forEach(e => {
-                const ini = e.primer_mes.slice(0, 7);
+                const ini = e.PrimerMes.slice(0, 7);
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td><strong>${esc(e.nombre)}</strong></td>
-                    <td>${esc(e.ciclo_nombre)}</td>
-                    <td>${Number(e.monto_inscripcion) ? money(e.monto_inscripcion) : '—'}</td>
-                    <td>${money(e.monto_colegiatura)}</td>
-                    <td>${e.num_meses} <small style="color:var(--texto-suave)">· ${rotuloMes(ini)} a ${rotuloMes(ultimoMes(ini, Number(e.num_meses)))}</small></td>
-                    <td>Día ${e.dia_vencimiento}</td>
-                    <td>${Number(e.recargo_monto) ? money(e.recargo_monto) + ' <small style="color:var(--texto-suave)">por mes vencido</small>' : '—'}</td>
+                    <td><strong>${esc(e.Nombre)}</strong></td>
+                    <td>${esc(e.CicloNombre)}</td>
+                    <td>${Number(e.MontoInscripcion) ? money(e.MontoInscripcion) : '—'}</td>
+                    <td>${money(e.MontoColegiatura)}</td>
+                    <td>${e.NumMeses} <small style="color:var(--texto-suave)">· ${rotuloMes(ini)} a ${rotuloMes(ultimoMes(ini, Number(e.NumMeses)))}</small></td>
+                    <td>Día ${e.DiaVencimiento}</td>
+                    <td>${Number(e.RecargoMonto) ? money(e.RecargoMonto) + ' <small style="color:var(--texto-suave)">por mes vencido</small>' : '—'}</td>
                     <td><div class="acciones">
                         <button class="icon-btn aplicar" title="Aplicar a alumnos"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
@@ -240,15 +239,15 @@ $img = $base . '/webService/wwwroot/img';
         }
         function abrirEdicion(e) {
             document.getElementById('modalTitulo').textContent = 'Editar esquema';
-            document.getElementById('id_esquema').value = e.id_esquema;
-            selCiclo.value = e.ciclo_id;
-            document.getElementById('nombre').value = e.nombre;
-            document.getElementById('monto_inscripcion').value = Number(e.monto_inscripcion) || '';
-            document.getElementById('monto_colegiatura').value = e.monto_colegiatura;
-            document.getElementById('dia_vencimiento').value = e.dia_vencimiento;
-            document.getElementById('recargo_monto').value = Number(e.recargo_monto) || '';
-            pintarPrimerMes(e.primer_mes.slice(0, 7));
-            pintarNumMeses(e.num_meses);
+            document.getElementById('id_esquema').value = e.IdEsquema;
+            selCiclo.value = e.IdCiclo;
+            document.getElementById('nombre').value = e.Nombre;
+            document.getElementById('monto_inscripcion').value = Number(e.MontoInscripcion) || '';
+            document.getElementById('monto_colegiatura').value = e.MontoColegiatura;
+            document.getElementById('dia_vencimiento').value = e.DiaVencimiento;
+            document.getElementById('recargo_monto').value = Number(e.RecargoMonto) || '';
+            pintarPrimerMes(e.PrimerMes.slice(0, 7));
+            pintarNumMeses(e.NumMeses);
             modal.showModal();
         }
 
@@ -256,20 +255,22 @@ $img = $base . '/webService/wwwroot/img';
             ev.preventDefault();
             const id = document.getElementById('id_esquema').value;
             const fd = new FormData();
-            ['ciclo_id', 'nombre', 'monto_colegiatura', 'primer_mes', 'num_meses', 'dia_vencimiento'].forEach(f => fd.append(f, document.getElementById(f).value));
-            fd.append('monto_inscripcion', document.getElementById('monto_inscripcion').value || 0);
-            fd.append('recargo_monto', document.getElementById('recargo_monto').value || 0);
-            let accion = 'crear';
-            if (id) { accion = 'editar'; fd.append('id_esquema', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
+            // Cada campo del formulario viaja con el nombre de la propiedad del model EsquemaPago
+            const campos = { IdCiclo: 'ciclo_id', Nombre: 'nombre', MontoColegiatura: 'monto_colegiatura', PrimerMes: 'primer_mes',
+                             NumMeses: 'num_meses', DiaVencimiento: 'dia_vencimiento' };
+            Object.entries(campos).forEach(([campo, input]) => fd.append(campo, document.getElementById(input).value));
+            fd.append('MontoInscripcion', document.getElementById('monto_inscripcion').value || 0);
+            fd.append('RecargoMonto', document.getElementById('recargo_monto').value || 0);
+            if (id) fd.append('IdEsquema', id);
+            const d = await (await fetch(API + '/guardar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(e) {
-            if (!await window.confirmar(`¿Eliminar el esquema "${e.nombre}"? Las colegiaturas que ya generó se conservan.`)) return;
-            const fd = new FormData(); fd.append('id_esquema', e.id_esquema);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
+            if (!await window.confirmar(`¿Eliminar el esquema "${e.Nombre}"? Las colegiaturas que ya generó se conservan.`)) return;
+            const fd = new FormData(); fd.append('IdEsquema', e.IdEsquema);
+            const d = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargar();
         }
@@ -278,21 +279,22 @@ $img = $base . '/webService/wwwroot/img';
 
         async function abrirAplicar(e) {
             // Desglose mes por mes: es exactamente lo que se guardará por alumno
-            const dg = await (await fetch(API + '?action=desglose&id_esquema=' + e.id_esquema)).json();
-            if (!dg.success) { window.notify('error', dg.message); return; }
+            const r = await (await fetch(API + '/desglose?IdEsquema=' + e.IdEsquema)).json();
+            if (!r.success) { window.notify('error', r.message); return; }
+            const dg = r.data;
             document.getElementById('desgloseFilas').innerHTML = dg.pagos.map(p => `
                 <tr>
-                    <td>${p.tipo === 'inscripcion' ? 'Inscripción' : esc(p.mes) + ' ' + p.anio}</td>
-                    <td>${p.fecha_vencimiento.split('-').reverse().join('/')}</td>
-                    <td class="num">${money(p.monto)}</td>
-                    <td class="num">${Number(p.recargo_monto) ? money(p.recargo_monto) + ' por mes' : '—'}</td>
+                    <td>${p.Tipo === 'inscripcion' ? 'Inscripción' : esc(p.Mes) + ' ' + p.Anio}</td>
+                    <td>${p.FechaVencimiento.split('-').reverse().join('/')}</td>
+                    <td class="num">${money(p.Monto)}</td>
+                    <td class="num">${Number(p.RecargoMonto) ? money(p.RecargoMonto) + ' por mes' : '—'}</td>
                 </tr>`).join('');
             document.getElementById('desgloseTotal').textContent = money(dg.total);
             porAplicar = e;
-            document.getElementById('aplicarInfo').innerHTML = `<strong>${esc(e.nombre)}</strong> · ${esc(e.ciclo_nombre)}`;
+            document.getElementById('aplicarInfo').innerHTML = `<strong>${esc(e.Nombre)}</strong> · ${esc(e.CicloNombre)}`;
             document.getElementById('aplicarA').value = 'todos';
-            document.getElementById('aGrupo').innerHTML = grupos.filter(g => String(g.ciclo_id) === String(e.ciclo_id))
-                .map(g => `<option value="${g.id_grupo}">${esc(g.grado)}</option>`).join('') || '<option value="">Sin grupos en este ciclo</option>';
+            document.getElementById('aGrupo').innerHTML = grupos.filter(g => String(g.IdCiclo) === String(e.IdCiclo))
+                .map(g => `<option value="${g.IdGrupo}">${esc(g.Grado)}</option>`).join('') || '<option value="">Sin grupos en este ciclo</option>';
             document.getElementById('aBuscar').value = '';
             verDestino(); pintarAlumnos(); pintarCuantos();
             mAplicar.showModal();
@@ -305,9 +307,9 @@ $img = $base . '/webService/wwwroot/img';
         // A cuántos alumnos se les generarán los pagos con la selección actual
         function pintarCuantos() {
             const v = document.getElementById('aplicarA').value;
-            const delCiclo = alumnos.filter(a => String(a.ciclo_id) === String(porAplicar.ciclo_id));
+            const delCiclo = alumnos.filter(a => String(a.IdCiclo) === String(porAplicar.IdCiclo));
             const n = v === 'todos' ? delCiclo.length
-                : v === 'grupo' ? delCiclo.filter(a => String(a.grupo_id) === document.getElementById('aGrupo').value).length
+                : v === 'grupo' ? delCiclo.filter(a => String(a.IdGrupo) === document.getElementById('aGrupo').value).length
                 : (document.getElementById('aAlumno').value ? 1 : 0);
             document.getElementById('aplicarCuantos').textContent = `Se aplicará a ${n} alumno(s).`;
         }
@@ -315,10 +317,10 @@ $img = $base . '/webService/wwwroot/img';
 
         function pintarAlumnos() {
             const q = document.getElementById('aBuscar').value.toLowerCase().trim();
-            const f = alumnos.filter(a => String(a.ciclo_id) === String(porAplicar.ciclo_id)
-                && (!q || `${a.nombre} ${a.matricula}`.toLowerCase().includes(q)));
+            const f = alumnos.filter(a => String(a.IdCiclo) === String(porAplicar.IdCiclo)
+                && (!q || `${a.Nombre} ${a.Matricula}`.toLowerCase().includes(q)));
             document.getElementById('aAlumno').innerHTML = f.length
-                ? f.map(a => `<option value="${a.id_cuenta}">${esc(a.nombre)} — ${esc(a.matricula)} (${esc(a.grado)})</option>`).join('')
+                ? f.map(a => `<option value="${a.IdCuenta}">${esc(a.Nombre)} — ${esc(a.Matricula)} (${esc(a.Grado)})</option>`).join('')
                 : '<option value="" disabled>Sin coincidencias</option>';
         }
         document.getElementById('aplicarA').addEventListener('change', verDestino);
@@ -327,20 +329,20 @@ $img = $base . '/webService/wwwroot/img';
         document.getElementById('btnAplicar').addEventListener('click', async (ev) => {
             const aplicarA = document.getElementById('aplicarA').value;
             const fd = new FormData();
-            fd.append('id_esquema', porAplicar.id_esquema);
-            fd.append('aplicar_a', aplicarA);
+            fd.append('IdEsquema', porAplicar.IdEsquema);
+            fd.append('AplicarA', aplicarA);
             if (aplicarA === 'grupo') {
                 const g = document.getElementById('aGrupo').value;
                 if (!g) { window.notify('error', 'Selecciona un grupo.'); return; }
-                fd.append('grupo_id', g);
+                fd.append('IdGrupo', g);
             }
             if (aplicarA === 'alumno') {
                 const c = document.getElementById('aAlumno').value;
                 if (!c) { window.notify('error', 'Selecciona un alumno.'); return; }
-                fd.append('cuenta_id', c);
+                fd.append('IdCuenta', c);
             }
             ev.target.disabled = true;
-            const d = await (await fetch(API + '?action=aplicar', { method: 'POST', body: fd })).json();
+            const d = await (await fetch(API + '/aplicar', { method: 'POST', body: fd })).json();
             ev.target.disabled = false;
             window.notifyResponse(d);
             if (d.success) mAplicar.close();

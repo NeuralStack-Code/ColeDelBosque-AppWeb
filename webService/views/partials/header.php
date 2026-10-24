@@ -30,7 +30,7 @@ if (isset($_SESSION['usuario'])) {
         </nav>
 
         <div class="nav-acciones">
-            <a href="<?= $base ?>/inicio-sesion" class="btn btn-fantasma">Iniciar sesión</a>
+            <a href="<?= $base ?>/auth/entrar" class="btn btn-fantasma">Iniciar sesión</a>
             <button class="hamburguesa" id="btnMenu" aria-label="Menú">&#9776;</button>
         </div>
     </div>
@@ -39,9 +39,9 @@ if (isset($_SESSION['usuario'])) {
 <script>
 async function cerrarSesion() {
     try {
-        await fetch((window.BASE_URL || '') + '/api/auth?action=logout', { method: 'POST' });
+        await fetch((window.BASE_URL || '') + '/auth/salir', { method: 'POST' });
     } catch {}
-    window.location.href = (window.BASE_URL || '') + '/inicio-sesion';
+    window.location.href = (window.BASE_URL || '') + '/auth/entrar';
 }
 
 // Menú hamburguesa (global)

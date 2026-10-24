@@ -1,97 +1,141 @@
 <?php
-
 /**
- * Recurso: recibos.  Ruta: /api/recibos?action=catalogos|listar|crear|editar|eliminar
- * Ingresos/egresos de la escuela (solo admin).
+ * Recibos: ingresos y egresos de la escuela (el administrador) y el recibo imprimible (también el alumno, solo los suyos).
+ *   /recibo/index      → pantalla de finanzas
+ *   /recibo/catalogos  → tipos de recibo, alumnos y docentes para el formulario
+ *   /recibo/listar     → los recibos con el balance
+ *   /recibo/guardar    → alta o cambio
+ *   /recibo/eliminar   → baja
+ *   /recibo/imprimir   → el recibo para imprimir o guardar en PDF (?IdRecibo=)
+ * Las URLs anteriores /administrador/recibos y /recibo?id= redirigen aquí (index.php raíz).
  */
-class ReciboController
+class ReciboController extends Controller
 {
-    private ReciboBusiness $recibos;
+    protected int $role = self::ADMIN;
+    protected array $readActions = ['index', 'listar', 'catalogos', 'imprimir'];
 
-    public function __construct(mysqli $conexion)
+    /** El recibo impreso también lo abre el alumno: ahí basta la sesión y el método revisa que sea suyo. */
+    public function authorize(string $action): void
     {
-        requireAdmin();
-        $this->recibos = new ReciboBusiness($conexion);
-    }
-
-    private function natValida(string $n): string
-    {
-        return $n === 'gasto' ? 'gasto' : 'ingreso';
-    }
-
-    private function destValido(string $d): string
-    {
-        return in_array($d, ['alumno', 'docente', 'escuela'], true) ? $d : 'escuela';
-    }
-
-    /** Lee y valida los campos POST de un recibo. Corta con response() si algo falla. */
-    private function leerRecibo(): array
-    {
-        $tipo  = (int) ($_POST['tipo_recibo_id'] ?? 0) ?: null;
-        $nat   = $this->natValida($_POST['naturaleza'] ?? 'ingreso');
-        $dtipo = $this->destValido($_POST['destinatario_tipo'] ?? 'escuela');
-        $monto = filter_var($_POST['monto'] ?? '', FILTER_VALIDATE_FLOAT);
-        $pago  = trim($_POST['tipo_pago'] ?? '');
-        $pago  = ($pago === '') ? null : $pago;
-        $com   = trim($_POST['comentario'] ?? '');
-        $com   = ($com === '') ? null : $com;
-        $fecha = trim($_POST['fecha'] ?? '');
-        $fecha = ($fecha === '') ? date('Y-m-d H:i:s') : str_replace('T', ' ', $fecha);
-
-        if ($monto === false || $monto <= 0) response(400, false, 'El monto debe ser mayor a 0.');
-
-        $cuenta = null;
-        if ($dtipo !== 'escuela') {
-            $cuenta = (int) ($_POST['cuenta_id'] ?? 0);
-            if ($cuenta <= 0) response(400, false, 'Selecciona el ' . $dtipo . ' destinatario.');
-            $permiso = $dtipo === 'alumno' ? 3 : 2;
-            if (!$this->recibos->cuentaValida($cuenta, $permiso)) {
-                response(400, false, 'El destinatario no es un ' . $dtipo . ' válido.');
-            }
+        if ($action === 'imprimir') {
+            $this->requireScreen();
+            return;
         }
-        return [$tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha];
+        parent::authorize($action);
+    }
+
+    public function index(): void
+    {
+        $this->view('admin/recibos');
     }
 
     public function catalogos(): void
     {
-        response(200, true, 'Catálogos.', [
-            'tipos'    => $this->recibos->tipos(),
-            'alumnos'  => $this->recibos->personas(3),
-            'docentes' => $this->recibos->personas(2),
-        ]);
+        $this->api->command('Tipos_recibo', 'TipoRecibo', 'List');
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $tipos = TipoRecibo::fromTable($result->table());
+
+        $this->api->command('Recibos', 'Recibo', 'People');
+        $this->api->addParameter('IdPermiso', 'I', self::PARENT);
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $alumnos = PersonaOpcion::fromTable($result->table());
+
+        $this->api->command('Recibos', 'Recibo', 'People');
+        $this->api->addParameter('IdPermiso', 'I', self::TEACHER);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Catálogos.', ['tipos' => $tipos, 'alumnos' => $alumnos, 'docentes' => PersonaOpcion::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
+        }
     }
 
+    /** Los recibos y el balance (ingresos menos egresos). */
     public function listar(): void
     {
-        $data = $this->recibos->listar();
-        response(200, true, 'Recibos obtenidos.', ['items' => $data['items'], 'saldo' => $data['saldo']]);
-    }
+        $this->api->command('Recibos', 'Recibo', 'List');
+        $result = $this->api->execute();
 
-    public function crear(): void
-    {
-        [$tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha] = $this->leerRecibo();
-        if (!$this->recibos->crear($tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha)) {
-            response(500, false, 'No se pudo registrar el recibo.');
+        if (!$result->status()) {
+            $recibos = Recibo::fromTable($result->table());
+            $saldo = array_sum(array_map(fn(Recibo $r) => ($r->esIngreso() ? 1 : -1) * $r->Monto, $recibos));
+            $this->success('Recibos obtenidos.', ['items' => $recibos, 'saldo' => $saldo]);
+        } else {
+            $this->failure($result);
         }
-        response(201, true, 'Recibo registrado.');
     }
 
-    public function editar(): void
+    /** Sin IdRecibo es un alta; con él, un cambio. Sin fecha es ahora; el destinatario alumno o docente pide su cuenta. */
+    public function guardar(Recibo $recibo): void
     {
-        $id = (int) ($_POST['id_recibo'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        [$tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha] = $this->leerRecibo();
-        if (!$this->recibos->editar($id, $tipo, $nat, $dtipo, $cuenta, $monto, $pago, $com, $fecha)) {
-            response(500, false, 'No se pudo actualizar el recibo.');
+        $naturaleza   = in_array($recibo->Naturaleza, Recibo::NATURES, true) ? $recibo->Naturaleza : 'ingreso';
+        $destinatario = in_array($recibo->DestinatarioTipo, Recibo::RECIPIENTS, true) ? $recibo->DestinatarioTipo : 'escuela';
+        $this->ensure($recibo->Monto > 0, 'El monto debe ser mayor a 0.');
+        if ($destinatario !== 'escuela') $this->ensure((int) $recibo->IdCuenta > 0, "Selecciona el $destinatario destinatario.");
+        $fecha = $recibo->Fecha === '' ? date('Y-m-d H:i:s') : str_replace('T', ' ', $recibo->Fecha);
+
+        if (!$recibo->IdRecibo) {
+            $this->api->command('Recibos', 'Recibo', 'Insert');
+        } else {
+            $this->api->command('Recibos', 'Recibo', 'Update');
+            $this->api->addParameter('IdRecibo', 'I', $recibo->IdRecibo);
         }
-        response(200, true, 'Recibo actualizado.');
+        $this->api->addParameter('IdTipoRecibo',     'I', $recibo->IdTipoRecibo ?: null);
+        $this->api->addParameter('Naturaleza',       'S', $naturaleza);
+        $this->api->addParameter('DestinatarioTipo', 'S', $destinatario);
+        $this->api->addParameter('IdCuenta',         'I', $destinatario === 'escuela' ? null : $recibo->IdCuenta);
+        $this->api->addParameter('Monto',            'N', $recibo->Monto);
+        $this->api->addParameter('TipoPago',         'S', $recibo->TipoPago);
+        $this->api->addParameter('Comentario',       'S', $recibo->Comentario);
+        $this->api->addParameter('Fecha',            'S', $fecha);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$recibo->IdRecibo) $this->success('Recibo registrado.', ['IdRecibo' => $result->id()], 201);
+            $this->success('Recibo actualizado.');
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function eliminar(): void
+    public function eliminar(int $IdRecibo): void
     {
-        $id = (int) ($_POST['id_recibo'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        if ($this->recibos->eliminar($id) === 0) response(404, false, 'No se encontró el recibo.');
-        response(200, true, 'Recibo eliminado.');
+        $this->api->command('Recibos', 'Recibo', 'Delete');
+        $this->api->addParameter('IdRecibo', 'I', $IdRecibo);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->ensure($result->affected() > 0, 'No se encontró el recibo.', 404);
+            $this->success('Recibo eliminado.');
+        } else {
+            $this->failure($result);
+        }
+    }
+
+    /** El recibo para imprimir. El administrador ve cualquiera; el alumno, solo los suyos. $id es el de la URL anterior (/recibo?id=). */
+    public function imprimir(int $IdRecibo = 0, int $id = 0): void
+    {
+        $this->api->command('Recibos', 'Recibo', 'Get');
+        $this->api->addParameter('IdRecibo', 'I', $IdRecibo ?: $id);
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+
+        header('Content-Type: text/html; charset=utf-8');
+        if ($result->row() === null) {
+            http_response_code(404);
+            exit('Recibo no encontrado.');
+        }
+        $recibo = Recibo::fromRow($result->row());
+
+        $propio = $this->roleId() === self::PARENT && $recibo->IdUsuarioCuenta === $this->userId() && $recibo->IdPermisoCuenta === self::PARENT;
+        if (!$this->isAdmin() && !$propio) {
+            http_response_code(403);
+            exit('No tienes acceso a este recibo.');
+        }
+
+        $this->view('recibo', ['recibo' => $recibo, 'volver' => $this->isAdmin() ? '/recibo/index' : '/padre/index']);
     }
 }

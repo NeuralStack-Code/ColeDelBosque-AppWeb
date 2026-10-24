@@ -1,18 +1,19 @@
 <?php
-/** Entidad ReporteColumna (columna configurable del reporte semanal). Solo variables. */
-class ReporteColumna
+/**
+ * Model ReporteColumna: una incidencia del reporte semanal que la maestra marca (casilla) o escribe (texto).
+ * Lo carga ReporteColumna::fromTable() desde sp_reporte_columna_listar y fromForm() desde su formulario.
+ */
+class ReporteColumna extends Model
 {
-    public ?int    $id_columna = null;
-    public ?string $nombre     = null;
-    public ?string $tipo       = null;   // casilla | texto
-    public ?string $etiqueta   = null;   // texto que sale en el correo si la casilla está marcada
-    public ?int    $orden      = null;
-    public ?int    $activo     = null;
+    public ?int    $IdColumna = null;
+    public string  $Nombre    = '';
+    public string  $Tipo      = 'casilla';   // casilla · texto
+    public ?string $Etiqueta  = null;        // lo que lee el papá cuando la casilla está marcada
+    public int     $Orden     = 0;
+    public bool    $Activo    = true;
 
-    public function __construct(array $fila = [])
+    public function esTexto(): bool
     {
-        foreach ($fila as $col => $val) {
-            if (property_exists($this, $col)) $this->$col = $val;
-        }
+        return $this->Tipo === 'texto';
     }
 }

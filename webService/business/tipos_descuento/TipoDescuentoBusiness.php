@@ -1,64 +1,46 @@
 <?php
-
-/** Catálogo de tipos de descuento (tabla tipo_descuento). Aquí vive el SQL. */
-class TipoDescuentoBusiness
+/** Entidad TipoDescuento: catálogo de descuentos (tabla tipo_descuento). Procedures: webService/sql/sp/sp_catalogos.sql. */
+class TipoDescuentoBusiness extends Entity
 {
-    private mysqli $db;
+    public ?int   $IdDescuento = null;
+    public string $Nombre      = '';
+    public float  $Porcentaje  = 0.0;
+    public string $AplicaA     = 'colegiatura';
+    public int    $Activo      = 1;
 
-    public function __construct(mysqli $db)
+    public function list(): array
     {
-        $this->db = $db;
+        $this->db->command('sp_tipodescuento_listar');
+        return $this->db->execute();
     }
 
-    /** @return TipoDescuento[] */
-    public function listar(): array
+    /** Nace activo. */
+    public function insert(): array
     {
-        $res = mysqli_query($this->db,
-            'SELECT t.id_descuento, t.nombre, t.porcentaje, t.aplica_a, (s.clave = "activo") AS activo
-             FROM tipo_descuento t LEFT JOIN status s ON s.id_status = t.status_id
-             ORDER BY t.aplica_a, t.nombre');
-        $items = [];
-        while ($r = mysqli_fetch_assoc($res)) $items[] = new TipoDescuento($r);
-        return $items;
+        $this->db->command('sp_tipodescuento_crear');
+        $this->db->addParameter('Nombre',     $this->Nombre);
+        $this->db->addParameter('Porcentaje', $this->Porcentaje);
+        $this->db->addParameter('AplicaA',    $this->AplicaA);
+        return $this->db->execute();
     }
 
-    public function crear(string $nombre, float $pct, string $aplica): bool
+    /** 'notfound' si no existe. */
+    public function update(): array
     {
-        $stActivo = statusId($this->db, 'descuento', 'activo');
-        $stmt = mysqli_prepare($this->db, 'INSERT INTO tipo_descuento (nombre, porcentaje, aplica_a, status_id) VALUES (?, ?, ?, ?)');
-        mysqli_stmt_bind_param($stmt, 'sdsi', $nombre, $pct, $aplica, $stActivo);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
+        $this->db->command('sp_tipodescuento_editar');
+        $this->db->addParameter('IdDescuento', $this->IdDescuento);
+        $this->db->addParameter('Nombre',      $this->Nombre);
+        $this->db->addParameter('Porcentaje',  $this->Porcentaje);
+        $this->db->addParameter('AplicaA',     $this->AplicaA);
+        $this->db->addParameter('Activo',      $this->Activo);
+        return $this->db->execute();
     }
 
-    public function editar(int $id, string $nombre, float $pct, string $aplica, int $activo): bool
+    /** Regresa las filas afectadas; 'en_uso' si ya hay pagos con ese descuento. */
+    public function delete(): array
     {
-        $stId = statusId($this->db, 'descuento', $activo === 1 ? 'activo' : 'inactivo');
-        $stmt = mysqli_prepare($this->db,
-            'UPDATE tipo_descuento SET nombre = ?, porcentaje = ?, aplica_a = ?, status_id = ? WHERE id_descuento = ?');
-        mysqli_stmt_bind_param($stmt, 'sdsii', $nombre, $pct, $aplica, $stId, $id);
-        $ok = mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
-        return $ok;
-    }
-
-    /** ¿Hay colegiaturas usando este descuento? */
-    public function tieneColegiaturas(int $id): bool
-    {
-        $chk = mysqli_prepare($this->db, 'SELECT 1 FROM colegiatura WHERE tipo_descuento_id = ? LIMIT 1');
-        mysqli_stmt_bind_param($chk, 'i', $id);
-        mysqli_stmt_execute($chk);
-        $hay = (bool) mysqli_fetch_row(mysqli_stmt_get_result($chk));
-        mysqli_stmt_close($chk);
-        return $hay;
-    }
-
-    public function eliminar(int $id): void
-    {
-        $stmt = mysqli_prepare($this->db, 'DELETE FROM tipo_descuento WHERE id_descuento = ?');
-        mysqli_stmt_bind_param($stmt, 'i', $id);
-        mysqli_stmt_execute($stmt);
-        mysqli_stmt_close($stmt);
+        $this->db->command('sp_tipodescuento_eliminar');
+        $this->db->addParameter('IdDescuento', $this->IdDescuento);
+        return $this->db->execute();
     }
 }

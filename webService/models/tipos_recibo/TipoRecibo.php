@@ -1,15 +1,10 @@
 <?php
-/** Entidad TipoRecibo. Solo variables. */
-class TipoRecibo
+/** Model TipoRecibo. Lo carga TipoRecibo::fromTable() desde sp_tiporecibo_listar y TipoRecibo::fromForm() desde su formulario. */
+class TipoRecibo extends Model
 {
-    public ?int    $id_tipo    = null;
-    public ?string $nombre     = null;
-    public ?string $naturaleza = null;   // ingreso | gasto
+    public const NATURES = ['ingreso', 'gasto'];
 
-    public function __construct(array $fila = [])
-    {
-        foreach ($fila as $col => $val) {
-            if (property_exists($this, $col)) $this->$col = $val;
-        }
-    }
+    public ?int   $IdTipo     = null;
+    public string $Nombre     = '';
+    public string $Naturaleza = 'ingreso';   // ingreso · gasto
 }

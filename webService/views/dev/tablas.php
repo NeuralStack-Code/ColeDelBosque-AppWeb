@@ -1,7 +1,5 @@
 <?php
-$rol = 4;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Visor de tablas (solo lectura). Lo pinta TablasController::index(). Recibe $base. Su JavaScript llama a /tablas/<método>. */
 $title = 'Tablas | Desarrollador';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -46,32 +44,32 @@ $img = $base . '/webService/wwwroot/img';
     </section>
 
     <script>
-        const API = window.BASE_URL + '/api/tablas';
+        const API = window.BASE_URL + '/tablas';   // cada método del controller es una URL: /tablas/listar, /tablas/ver
         const thead = document.getElementById('thead');
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const meta = document.getElementById('meta');
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
         const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
         async function cargarTablas() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            const items = d.items || [];
+            const result = await (await fetch(API + '/listar')).json();
+            const items = result.data.items || [];
             document.getElementById('fTabla').innerHTML = '<option value="">Selecciona…</option>' +
-                items.map(t => `<option value="${t.tabla}">${t.tabla} (${t.filas})</option>`).join('');
+                items.map(t => `<option value="${t.Tabla}">${t.Tabla} (${t.Filas})</option>`).join('');
         }
 
         async function verTabla() {
             const tabla = document.getElementById('fTabla').value;
             const limite = document.getElementById('fLimite').value;
             if (!tabla) { thead.innerHTML = ''; filas.innerHTML = ''; meta.textContent = ''; vacio.style.display = 'block'; return; }
-            const d = await (await fetch(`${API}?action=ver&tabla=${encodeURIComponent(tabla)}&limite=${limite}`)).json();
-            if (!d.success) { window.notify('error', d.message); return; }
-            const cols = d.columnas || [], rows = d.filas || [];
+            const result = await (await fetch(`${API}/ver?Tabla=${encodeURIComponent(tabla)}&Limite=${limite}`)).json();
+            if (!result.success) { window.notify('error', result.message); return; }
+            const cols = result.data.columnas || [], rows = result.data.filas || [];
             thead.innerHTML = '<tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr>';
             filas.innerHTML = rows.map(r =>
                 '<tr>' + cols.map(c => `<td>${esc(r[c])}</td>`).join('') + '</tr>').join('');

@@ -2,6 +2,11 @@ Options -Indexes
 RewriteEngine On
 RewriteBase /
 
+# El código, las vistas, las fuentes SQL y los archivos de proyecto nunca se sirven directo: solo se entra por
+# index.php (una vista abierta directo se saltaría su controller y sus guardias). De webService solo es público wwwroot.
+RewriteRule ^(apiService|vendor|storage|webService/(views|controllers|business|models|libs|sql))(/|$) - [F,L,NC]
+RewriteRule (^|/)(composer\.(json|lock)|[^/]+\.(sql|md))$ - [F,L,NC]
+
 # Archivos y directorios reales → sirve directo
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d

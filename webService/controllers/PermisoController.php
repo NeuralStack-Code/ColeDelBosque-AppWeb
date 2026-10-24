@@ -1,49 +1,69 @@
 <?php
-
 /**
- * Recurso: permisos.  Ruta: /api/permisos?action=listar|crear|editar|eliminar
- * Catálogo de roles (solo desarrollador, permiso 4).
+ * Permisos: el catálogo de roles (solo el desarrollador).
+ *   /permiso/index     → pantalla del catálogo
+ *   /permiso/listar    → los roles, con cuántas cuentas tiene cada uno
+ *   /permiso/guardar   → alta o cambio
+ *   /permiso/eliminar  → baja (nunca los roles base del sistema ni uno con cuentas)
+ * La URL anterior /desarrollador/permisos redirige a /permiso/index (index.php raíz).
  */
-class PermisoController
+class PermisoController extends Controller
 {
-    private PermisoBusiness $permisos;
+    protected int $role = self::DEVELOPER;
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireDev();
-        $this->permisos = new PermisoBusiness($conexion);
+        $this->view('dev/permisos');
     }
 
     public function listar(): void
     {
-        response(200, true, 'Permisos obtenidos.', ['items' => $this->permisos->listar()]);
+        $this->api->command('Permisos', 'Permiso', 'List');
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Permisos obtenidos.', ['items' => Permiso::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function crear(): void
+    /** Sin IdPermiso es un alta; con él, un cambio. */
+    public function guardar(Permiso $permiso): void
     {
-        $nombre = trim($_POST['nombre'] ?? '');
-        if ($nombre === '') response(400, false, 'El nombre del rol es obligatorio.');
-        if (!$this->permisos->crear($nombre)) response(500, false, 'No se pudo crear el rol.');
-        response(201, true, 'Rol creado.');
+        $this->ensure($permiso->Nombre !== '', 'El nombre del rol es obligatorio.');
+        $this->ensure((bool) preg_match('/^.{1,25}$/us', $permiso->Nombre), 'El nombre del rol admite máximo 25 caracteres.');
+
+        if (!$permiso->IdPermiso) {
+            $this->api->command('Permisos', 'Permiso', 'Insert');
+        } else {
+            $this->api->command('Permisos', 'Permiso', 'Update');
+            $this->api->addParameter('IdPermiso', 'I', $permiso->IdPermiso);
+        }
+        $this->api->addParameter('Nombre', 'S', $permiso->Nombre);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$permiso->IdPermiso) $this->success('Rol creado.', ['IdPermiso' => $result->id()], 201);
+            $this->success('Rol actualizado.');
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function editar(): void
+    public function eliminar(int $IdPermiso): void
     {
-        $id     = (int) ($_POST['id_permiso'] ?? 0);
-        $nombre = trim($_POST['nombre'] ?? '');
-        if ($id <= 0)       response(400, false, 'Registro no válido.');
-        if ($nombre === '') response(400, false, 'El nombre del rol es obligatorio.');
-        if (!$this->permisos->editar($id, $nombre)) response(500, false, 'No se pudo actualizar el rol.');
-        response(200, true, 'Rol actualizado.');
-    }
+        $this->ensure($IdPermiso > Permiso::LAST_SYSTEM_ROLE, 'No se pueden eliminar los roles base del sistema.', 409);
 
-    public function eliminar(): void
-    {
-        $id = (int) ($_POST['id_permiso'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        if ($id >= 1 && $id <= 4) response(409, false, 'No se pueden eliminar los roles base del sistema.');
-        if ($this->permisos->tieneCuentas($id)) response(409, false, 'No se puede eliminar: hay cuentas con este rol.');
-        $this->permisos->eliminar($id);
-        response(200, true, 'Rol eliminado.');
+        $this->api->command('Permisos', 'Permiso', 'Delete');
+        $this->api->addParameter('IdPermiso', 'I', $IdPermiso);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->ensure($result->affected() > 0, 'No se encontró el rol.', 404);
+            $this->success('Rol eliminado.');
+        } else {
+            $this->failure($result);
+        }
     }
 }

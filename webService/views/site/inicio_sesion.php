@@ -1,6 +1,5 @@
 <?php
-if (!defined('BASE_URL')) require_once __DIR__ . '/../../../apiService/core/config.php';
-$base     = BASE_URL;
+/** Pantalla de inicio de sesión. La pinta AuthController::entrar(). Recibe $base. */
 $title    = 'Inicio de sesión | Colegio del Bosque';
 $extraCss = ['sesion.css'];
 $img      = $base . '/webService/wwwroot/img';
@@ -34,7 +33,7 @@ $img      = $base . '/webService/wwwroot/img';
                 <form id="formLogin" method="POST">
                     <label for="pass">Matrícula / ID</label>
                     <div class="input-pass">
-                        <input id="pass" type="password" name="matricula" required placeholder="Ingresa tu ID">
+                        <input id="pass" type="password" name="Matricula" required placeholder="Ingresa tu ID">
                         <img class="ojo" id="imgVerContrasena" src="<?= $img ?>/ver.png" alt="Ver/ocultar">
                     </div>
                     <span class="olvida" id="olvidaMatricula">He olvidado la matrícula</span>
@@ -59,21 +58,21 @@ $img      = $base . '/webService/wwwroot/img';
             window.notify('info', 'Comunícate con la administración del colegio para recuperar tu matrícula.');
         });
 
-        // Enviar login a la API de auth
+        // Entrar: /auth/entrar
         const formLogin = document.getElementById('formLogin');
         const btnLogin = document.getElementById('isbtn');
         formLogin.addEventListener('submit', async (e) => {
             e.preventDefault();
             btnLogin.disabled = true;
             try {
-                const r = await fetch(window.BASE_URL + '/api/auth?action=login', {
+                const response = await fetch(window.BASE_URL + '/auth/entrar', {
                     method: 'POST',
                     body: new FormData(formLogin)
                 });
-                const data = await r.json();
-                window.notifyResponse(data);
-                if (data.success && data.redirect) {
-                    setTimeout(() => location.href = data.redirect, 600);
+                const result = await response.json();
+                window.notifyResponse(result);
+                if (result.success && result.data.redirect) {
+                    setTimeout(() => location.href = window.BASE_URL + result.data.redirect, 600);
                     return;
                 }
             } catch (err) {

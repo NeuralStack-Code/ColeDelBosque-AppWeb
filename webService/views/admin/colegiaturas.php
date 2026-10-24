@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de colegiaturas. La pinta ColegiaturaController::index(). Recibe $base. Su JavaScript llama a /colegiatura/<método>. */
 $title = 'Colegiaturas | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -31,8 +29,8 @@ $img = $base . '/webService/wwwroot/img';
         <div class="admin-cab">
             <h2>Colegiaturas <small id="cicloRotulo" style="font-size:.9rem;color:var(--texto-suave);font-weight:600;"></small></h2>
             <div style="display:flex;gap:10px;">
-                <a class="btn btn-fantasma" href="<?= $base ?>/administrador/tipos-descuento">Tipos de descuento</a>
-                <a class="btn btn-primario" href="<?= $base ?>/administrador/esquemas-pago">Esquemas de pago</a>
+                <a class="btn btn-fantasma" href="<?= $base ?>/tipodescuento/index">Tipos de descuento</a>
+                <a class="btn btn-primario" href="<?= $base ?>/esquemapago/index">Esquemas de pago</a>
             </div>
         </div>
 
@@ -108,7 +106,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/colegiaturas';
+        const API = window.BASE_URL + '/colegiatura';
         const money = n => '$' + Number(n || 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
         const o = v => Number(v) ? money(v) : '—';   // monto opcional: 0 → raya
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -119,54 +117,54 @@ $img = $base . '/webService/wwwroot/img';
         let cuentaAbierta = null;   // cuenta_id del alumno en la ventana
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         /* ---------- Datos ---------- */
 
-        const estDe = c => (c.estatus || 'pendiente').toLowerCase();
-        const saldoDe = c => estDe(c) === 'pagado' ? 0 : Number(c.saldo);
-        const abonadoDe = c => estDe(c) === 'pagado' ? Number(c.total) : Number(c.abonado);
+        const estDe = c => (c.Estatus || 'pendiente').toLowerCase();
+        const saldoDe = c => estDe(c) === 'pagado' ? 0 : Number(c.Saldo);
+        const abonadoDe = c => estDe(c) === 'pagado' ? Number(c.Total) : Number(c.Abonado);
         const hoy = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })();
-        const conceptoDe = c => c.tipo === 'inscripcion' ? 'Inscripción'
-            : (c.mes ?? '') + (c.fecha_vencimiento ? ' ' + c.fecha_vencimiento.slice(0, 4) : '');
+        const conceptoDe = c => c.Tipo === 'inscripcion' ? 'Inscripción'
+            : (c.Mes ?? '') + (c.FechaVencimiento ? ' ' + c.FechaVencimiento.slice(0, 4) : '');
 
         // Pagos de un alumno: inscripción primero y luego por vencimiento
         function pagosDe(cuentaId) {
-            return todos.filter(c => String(c.cuenta_id) === String(cuentaId))
-                .sort((a, b) => (a.tipo === 'inscripcion' ? 0 : 1) - (b.tipo === 'inscripcion' ? 0 : 1)
-                    || String(a.fecha_vencimiento).localeCompare(String(b.fecha_vencimiento)));
+            return todos.filter(c => String(c.IdCuenta) === String(cuentaId))
+                .sort((a, b) => (a.Tipo === 'inscripcion' ? 0 : 1) - (b.Tipo === 'inscripcion' ? 0 : 1)
+                    || String(a.FechaVencimiento).localeCompare(String(b.FechaVencimiento)));
         }
 
         // Un resumen por alumno a partir de sus pagos
         function resumenes() {
             const mapa = new Map();
             todos.forEach(c => {
-                let r = mapa.get(c.cuenta_id);
-                if (!r) mapa.set(c.cuenta_id, r = { cuenta_id: c.cuenta_id, alumno: c.alumno, grado: c.grado, grupo_id: c.grupo_id,
+                let r = mapa.get(c.IdCuenta);
+                if (!r) mapa.set(c.IdCuenta, r = { cuenta_id: c.IdCuenta, alumno: c.Alumno, grado: c.Grado, grupo_id: c.IdGrupo,
                     pagos: 0, cubiertos: 0, total: 0, abonado: 0, saldo: 0, vencido: 0 });
                 r.pagos++;
                 if (estDe(c) === 'pagado') r.cubiertos++;
-                r.total += Number(c.total); r.abonado += abonadoDe(c); r.saldo += saldoDe(c);
-                if (saldoDe(c) > 0 && c.fecha_vencimiento && c.fecha_vencimiento < hoy) r.vencido += saldoDe(c);
+                r.total += Number(c.Total); r.abonado += abonadoDe(c); r.saldo += saldoDe(c);
+                if (saldoDe(c) > 0 && c.FechaVencimiento && c.FechaVencimiento < hoy) r.vencido += saldoDe(c);
             });
             return [...mapa.values()].map(r => ({ ...r, estatus: r.saldo <= 0.005 ? 'pagado' : (r.vencido > 0 ? 'adeudo' : 'corriente') }));
         }
 
         async function cargarCatalogos() {
-            const d = await (await fetch(API + '?action=catalogos')).json();
+            const d = (await (await fetch(API + '/catalogos')).json()).data || {};
             descuentos = d.descuentos || [];
             estatusMap = {};
-            (d.estatus || []).forEach(s => estatusMap[s.clave] = s.nombre);
+            (d.estatus || []).forEach(s => estatusMap[s.Clave] = s.Nombre);
             document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>'
-                + (d.grupos || []).map(g => `<option value="${g.id_grupo}">${esc(g.grado)}</option>`).join('');
-            document.getElementById('cicloRotulo').textContent = d.ciclo ? '· ' + d.ciclo.nombre : '· sin ciclo activo';
+                + (d.grupos || []).map(g => `<option value="${g.IdGrupo}">${esc(g.Grado)}</option>`).join('');
+            document.getElementById('cicloRotulo').textContent = d.ciclo ? '· ' + d.ciclo.Nombre : '· sin ciclo activo';
         }
 
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
-            todos = d.items || [];
+            const d = await (await fetch(API + '/listar')).json();
+            todos = d.data?.items || [];
             render();
             if (cuentaAbierta !== null && mAlumno.open) pintarCuenta();
         }
@@ -210,7 +208,7 @@ $img = $base . '/webService/wwwroot/img';
         function abrirCuenta(cuentaId) {
             cuentaAbierta = cuentaId;
             document.getElementById('aDesc').innerHTML = '<option value="0">Quitar descuento</option>'
-                + descuentos.map(d => `<option value="${d.id_descuento}">${esc(d.nombre)} (${Number(d.porcentaje)}% · ${d.aplica_a === 'inscripcion' ? 'inscripción' : 'colegiatura'})</option>`).join('');
+                + descuentos.map(d => `<option value="${d.IdDescuento}">${esc(d.Nombre)} (${Number(d.Porcentaje)}% · ${d.AplicaA === 'inscripcion' ? 'inscripción' : 'colegiatura'})</option>`).join('');
             pintarCuenta(true);
             mAlumno.showModal();
         }
@@ -219,24 +217,24 @@ $img = $base . '/webService/wwwroot/img';
         function pintarCuenta(marcarVencidos = false) {
             const suyos = pagosDe(cuentaAbierta);
             if (!suyos.length) { mAlumno.close(); return; }
-            const marcados = new Set(seleccion().map(c => String(c.id_pago)));
+            const marcados = new Set(seleccion().map(c => String(c.IdPago)));
             const t = { monto: 0, descuento: 0, recargo: 0, total: 0, abonado: 0, saldo: 0 };
 
             document.getElementById('alFilas').innerHTML = suyos.map(c => {
                 const est = estDe(c), pagado = est === 'pagado';
-                t.monto += Number(c.monto); t.descuento += Number(c.descuento); t.recargo += Number(c.recargo_calc);
-                t.total += Number(c.total); t.abonado += abonadoDe(c); t.saldo += saldoDe(c);
-                const vencido = !pagado && c.fecha_vencimiento && c.fecha_vencimiento < hoy;
-                const marcar = !pagado && (marcarVencidos ? vencido : marcados.has(String(c.id_pago)));
-                const recibo = c.recibo_id ? `<a class="icon-btn" title="Ver recibo" href="${window.BASE_URL}/recibo?id=${c.recibo_id}" target="_blank">🧾</a>` : '';
-                return `<tr data-id="${c.id_pago}">
+                t.monto += Number(c.Monto); t.descuento += Number(c.Descuento); t.recargo += Number(c.RecargoCalc);
+                t.total += Number(c.Total); t.abonado += abonadoDe(c); t.saldo += saldoDe(c);
+                const vencido = !pagado && c.FechaVencimiento && c.FechaVencimiento < hoy;
+                const marcar = !pagado && (marcarVencidos ? vencido : marcados.has(String(c.IdPago)));
+                const recibo = c.IdRecibo ? `<a class="icon-btn" title="Ver recibo" href="${window.BASE_URL}/recibo/imprimir?IdRecibo=${c.IdRecibo}" target="_blank">🧾</a>` : '';
+                return `<tr data-id="${c.IdPago}">
                     <td><input type="checkbox" class="alChk" ${pagado ? 'disabled' : ''} ${marcar ? 'checked' : ''} aria-label="Seleccionar ${esc(conceptoDe(c))}"></td>
                     <td>${esc(conceptoDe(c))}</td>
-                    <td style="color:${vencido ? 'var(--rojo)' : 'inherit'}">${c.fecha_vencimiento ? c.fecha_vencimiento.split('-').reverse().join('/') : '—'}</td>
-                    <td class="num">${money(c.monto)}</td>
-                    <td class="num" style="color:${Number(c.descuento) ? 'var(--verde)' : 'inherit'}" title="${esc(c.concepto_descuento ?? '')}">${Number(c.descuento) ? '−' + money(c.descuento) : '—'}</td>
-                    <td class="num" style="color:${Number(c.recargo_calc) ? 'var(--rojo)' : 'inherit'}" title="${Number(c.recargo_monto) ? money(c.recargo_monto) + ' por mes vencido' : ''}">${o(c.recargo_calc)}</td>
-                    <td class="num"><strong>${money(c.total)}</strong></td>
+                    <td style="color:${vencido ? 'var(--rojo)' : 'inherit'}">${c.FechaVencimiento ? c.FechaVencimiento.split('-').reverse().join('/') : '—'}</td>
+                    <td class="num">${money(c.Monto)}</td>
+                    <td class="num" style="color:${Number(c.Descuento) ? 'var(--verde)' : 'inherit'}" title="${esc(c.ConceptoDescuento ?? '')}">${Number(c.Descuento) ? '−' + money(c.Descuento) : '—'}</td>
+                    <td class="num" style="color:${Number(c.RecargoCalc) ? 'var(--rojo)' : 'inherit'}" title="${Number(c.RecargoMonto) ? money(c.RecargoMonto) + ' por mes vencido' : ''}">${o(c.RecargoCalc)}</td>
+                    <td class="num"><strong>${money(c.Total)}</strong></td>
                     <td class="num">${o(abonadoDe(c))}</td>
                     <td class="num">${o(saldoDe(c))}</td>
                     <td><span class="badge-estatus ${est}">${esc(estatusMap[est] || est)}</span></td>
@@ -253,19 +251,19 @@ $img = $base . '/webService/wwwroot/img';
                 <td class="num">${o(t.abonado)}</td>
                 <td class="num">${money(t.saldo)}</td>
                 <td colspan="2"></td></tr>`;
-            document.getElementById('alTitulo').textContent = suyos[0].alumno;
-            document.getElementById('alSub').textContent = (suyos[0].grado ?? 'Sin grupo') + ' · ' + suyos.length + ' pago(s)';
+            document.getElementById('alTitulo').textContent = suyos[0].Alumno;
+            document.getElementById('alSub').textContent = (suyos[0].Grado ?? 'Sin grupo') + ' · ' + suyos.length + ' pago(s)';
 
             document.querySelectorAll('#alFilas .alChk').forEach(ch => ch.addEventListener('change', pintarSeleccion));
             document.querySelectorAll('#alFilas .borrar').forEach(b => b.addEventListener('click', () =>
-                eliminar(todos.find(c => String(c.id_pago) === b.closest('tr').dataset.id))));
+                eliminar(todos.find(c => String(c.IdPago) === b.closest('tr').dataset.id))));
             pintarSeleccion();
         }
 
         // Pagos marcados en la ventana
         function seleccion() {
             const ids = [...document.querySelectorAll('#alFilas .alChk:checked')].map(ch => ch.closest('tr').dataset.id);
-            return todos.filter(c => ids.includes(String(c.id_pago)));
+            return todos.filter(c => ids.includes(String(c.IdPago)));
         }
 
         function pintarSeleccion() {
@@ -278,7 +276,7 @@ $img = $base . '/webService/wwwroot/img';
                 : 'Marca los pagos a los que quieras aplicar un descuento, un recargo o un pago.';
 
             // El recargo viene del esquema de pago: aquí se muestra el que ya tienen y solo se cambia como excepción
-            const recargos = [...new Set(sel.map(c => Number(c.recargo_monto)))];
+            const recargos = [...new Set(sel.map(c => Number(c.RecargoMonto)))];
             const rec = document.getElementById('aRec');
             rec.value = recargos.length === 1 ? recargos[0].toFixed(2) : '';
             rec.placeholder = recargos.length > 1 ? 'Varios' : '';
@@ -317,10 +315,10 @@ $img = $base . '/webService/wwwroot/img';
             let ok = 0, error = '';
             for (const c of pagos) {
                 const fd = new FormData();
-                fd.append('id_pago', c.id_pago);
+                fd.append('IdPago', c.IdPago);
                 Object.entries(datos(c)).forEach(([k, v]) => fd.append(k, v));
                 try {
-                    const d = await (await fetch(`${API}?action=${accion}`, { method: 'POST', body: fd })).json();
+                    const d = await (await fetch(`${API}/${accion}`, { method: 'POST', body: fd })).json();
                     if (d.success) ok++; else error = error || d.message;
                 } catch { error = error || 'No se pudo conectar con el servidor.'; }
             }
@@ -334,16 +332,16 @@ $img = $base . '/webService/wwwroot/img';
         document.getElementById('btnDesc').addEventListener('click', () => {
             if (!haySeleccion()) return;
             const id = document.getElementById('aDesc').value;
-            const desc = descuentos.find(d => String(d.id_descuento) === id);
+            const desc = descuentos.find(d => String(d.IdDescuento) === id);
             let sel = seleccion();
             if (desc) {
                 // Cada descuento del catálogo es para inscripción o para colegiatura
-                const aplican = sel.filter(c => (c.tipo === 'inscripcion' ? 'inscripcion' : 'colegiatura') === desc.aplica_a);
+                const aplican = sel.filter(c => (c.Tipo === 'inscripcion' ? 'inscripcion' : 'colegiatura') === desc.AplicaA);
                 if (!aplican.length) { window.notify('warning', 'Ese descuento no aplica a los pagos seleccionados.'); return; }
                 if (aplican.length < sel.length) window.notify('info', `${sel.length - aplican.length} pago(s) se omiten: el descuento no aplica a ese tipo.`);
                 sel = aplican;
             }
-            enLote(sel, 'descuento', () => ({ tipo_descuento_id: id }), desc ? 'Descuento aplicado' : 'Descuento quitado');
+            enLote(sel, 'descuento', () => ({ IdDescuento: id }), desc ? 'Descuento aplicado' : 'Descuento quitado');
         });
 
         document.getElementById('btnRec').addEventListener('click', () => {
@@ -351,7 +349,7 @@ $img = $base . '/webService/wwwroot/img';
             const v = document.getElementById('aRec').value;
             const monto = v === '' ? NaN : Number(v);
             if (isNaN(monto) || monto < 0) { window.notify('error', 'Captura el recargo en pesos (0 para quitarlo).'); return; }
-            enLote(seleccion(), 'recargo', () => ({ recargo_monto: monto }), monto > 0 ? 'Recargo actualizado' : 'Recargo quitado');
+            enLote(seleccion(), 'recargo', () => ({ RecargoMonto: monto }), monto > 0 ? 'Recargo actualizado' : 'Recargo quitado');
         });
 
         document.getElementById('btnPago').addEventListener('click', async () => {
@@ -361,19 +359,19 @@ $img = $base . '/webService/wwwroot/img';
             const monto = Number(document.getElementById('aMonto').value);
             if (sel.length === 1) {
                 if (!monto || monto <= 0) { window.notify('error', 'Captura un monto válido.'); return; }
-                return enLote(sel, 'registrar_pago', () => ({ monto, tipo_pago: metodo }), 'Pago registrado');
+                return enLote(sel, 'pagar', () => ({ Monto: monto, TipoPago: metodo }), 'Pago registrado');
             }
             const total = sel.reduce((s, c) => s + saldoDe(c), 0);
             if (!await window.confirmar(`Se saldarán ${sel.length} pagos por ${money(total)} en ${metodo.toLowerCase()} y se generará un recibo por cada uno.`,
                 { titulo: '¿Registrar los pagos?', confirmar: 'Registrar', peligro: false })) return;
-            enLote(sel, 'registrar_pago', () => ({ tipo_pago: metodo }), 'Pago registrado');
+            enLote(sel, 'pagar', () => ({ TipoPago: metodo }), 'Pago registrado');
         });
 
         async function eliminar(c) {
-            const concepto = c.tipo === 'inscripcion' ? 'la inscripción' : `la colegiatura de ${conceptoDe(c)}`;
-            if (!await window.confirmar(`¿Eliminar ${concepto} de ${c.alumno}?`)) return;
-            const fd = new FormData(); fd.append('id_pago', c.id_pago);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
+            const concepto = c.Tipo === 'inscripcion' ? 'la inscripción' : `la colegiatura de ${conceptoDe(c)}`;
+            if (!await window.confirmar(`¿Eliminar ${concepto} de ${c.Alumno}?`)) return;
+            const fd = new FormData(); fd.append('IdPago', c.IdPago);
+            const d = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargar();
         }

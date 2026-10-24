@@ -1,12 +1,9 @@
 <?php
-$rol = 2; // solo maestros
-require __DIR__ . '/../partials/guard.php';
-
-$base     = BASE_URL;
+/** Reporte semanal de la maestra. La pinta ReporteController::index(). Recibe $base y $nombre. Su JavaScript llama a /reporte/<método>. */
 $title    = 'Reporte semanal | Colegio del Bosque';
 $extraCss = ['maestro.css'];
 $img      = $base . '/webService/wwwroot/img';
-$nombre   = $_SESSION['usuario'] ?? 'Maestro';
+$nombre   = $nombre ?: 'Maestro';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -106,7 +103,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/reportes';
+        const API = window.BASE_URL + '/reporte';
         const DIAS = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
         const dlgClase = document.getElementById('dlgClase');
         const dlgPrevia = document.getElementById('dlgPrevia');
@@ -115,42 +112,43 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         const corta = f => { const [, m, d] = f.split('-'); return `${d}/${m}`; };   // Y-m-d → d/m
 
         let ctx = { materias: [], columnas: [] };
-        let sem = null;          // respuesta de ?action=semana
+        let sem = null;          // respuesta de /reporte/semana
         let clase = null;        // clase abierta en el modal: { fecha, id_clase }
         let grupoId = '';        // grupo en el que se captura (el propio o uno de sus niveles de inglés)
         const selGrupo = document.getElementById('selGrupo');
 
         async function cerrarSesion() {
             try {
-                const r = await fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' });
+                const r = await fetch(window.BASE_URL + '/auth/salir', { method: 'POST' });
                 const d = await r.json();
                 if (d.redirect) { location.href = d.redirect; return; }
             } catch {}
-            location.href = window.BASE_URL + '/inicio-sesion';
+            location.href = window.BASE_URL + '/auth/entrar';
         }
 
+        // La respuesta con sus datos a la mano: { success, message, ...data }
         async function getJSON(url, opts) {
-            try { return await (await fetch(url, opts)).json(); }
+            try { const r = await (await fetch(url, opts)).json(); return { ...(r.data || {}), success: r.success, message: r.message }; }
             catch { return { success: false, message: 'No se pudo conectar con el servidor.' }; }
         }
 
         /* ---------------- Semana ---------------- */
 
         async function cargarContexto() {
-            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=contexto');
+            const d = await getJSON(API + '/contexto?IdGrupo=' + grupoId);
             if (!d.success) { window.notify('error', d.message); return false; }
             ctx = d;
-            grupoId = d.grupo_id;
-            selGrupo.innerHTML = d.grupos.map(g => `<option value="${g.id_grupo}">${esc(g.grado)}${g.solo_ingles ? ' (inglés)' : ''}</option>`).join('');
-            selGrupo.value = d.grupo_id;
+            grupoId = d.IdGrupo;
+            selGrupo.innerHTML = d.grupos.map(g => `<option value="${g.IdGrupo}">${esc(g.Grado)}${g.SoloIngles ? ' (inglés)' : ''}</option>`).join('');
+            selGrupo.value = d.IdGrupo;
             document.getElementById('cajaGrupo').style.display = d.grupos.length > 1 ? '' : 'none';
             document.getElementById('grado').textContent = d.grado ? '· ' + d.grado : '';
-            selMateria.innerHTML = d.materias.map(m => `<option value="${m.id_materia}">${esc(m.nombre)}</option>`).join('');
+            selMateria.innerHTML = d.materias.map(m => `<option value="${m.IdMateria}">${esc(m.Nombre)}</option>`).join('');
             return true;
         }
 
         async function cargarSemana(inicio = '') {
-            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=semana&inicio=' + encodeURIComponent(inicio));
+            const d = await getJSON(API + '/semana?IdGrupo=' + grupoId + '&Inicio=' + encodeURIComponent(inicio));
             if (!d.success) { window.notify('error', d.message); return; }
             sem = d;
             document.getElementById('semLbl').textContent = `${corta(d.dias[0])} al ${corta(d.dias[4])}`;
@@ -172,17 +170,17 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             const cont = document.getElementById('dias');
             cont.innerHTML = '';
             sem.dias.forEach((fecha, i) => {
-                const clases = sem.clases.filter(c => c.fecha === fecha);
+                const clases = sem.clases.filter(c => c.Fecha === fecha);
                 const card = document.createElement('div');
                 card.className = 'rep-dia';
                 card.innerHTML = `
                     <div class="rep-dia-cab"><strong>${DIAS[i]}</strong><span>${corta(fecha)}</span></div>
                     <div class="rep-clases">
                         ${clases.map(c => `
-                            <button type="button" class="rep-clase" data-materia="${c.materia_id}" ${ctx.materias.some(m => String(m.id_materia) === String(c.materia_id)) ? '' : 'disabled title="Clase de otra maestra"'}>
-                                <strong>${esc(c.materia)}</strong>
-                                <span>${esc(c.tema) || 'Sin tema'}</span>
-                                ${Number(c.incidencias) ? `<em>${c.incidencias} con incidencia</em>` : ''}
+                            <button type="button" class="rep-clase" data-materia="${c.IdMateria}" ${ctx.materias.some(m => String(m.IdMateria) === String(c.IdMateria)) ? '' : 'disabled title="Clase de otra maestra"'}>
+                                <strong>${esc(c.Materia)}</strong>
+                                <span>${esc(c.Tema) || 'Sin tema'}</span>
+                                ${Number(c.Incidencias) ? `<em>${c.Incidencias} con incidencia</em>` : ''}
                             </button>`).join('') || '<p class="rep-sin">Sin clases capturadas</p>'}
                     </div>
                     <button type="button" class="rep-agregar">+ Agregar clase</button>`;
@@ -197,13 +195,13 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
         function pintarTablaAlumnos() {
             document.getElementById('claseCab').innerHTML =
-                '<tr><th>Alumno</th>' + ctx.columnas.map(c => `<th>${esc(c.nombre)}</th>`).join('') + '</tr>';
+                '<tr><th>Alumno</th>' + ctx.columnas.map(c => `<th>${esc(c.Nombre)}</th>`).join('') + '</tr>';
             document.getElementById('claseFilas').innerHTML = sem.alumnos.map(a => `
-                <tr data-id="${a.id_cuenta}">
-                    <td class="alumno">${esc(a.nombre_completo)}</td>
-                    ${ctx.columnas.map(c => c.tipo === 'texto'
-                        ? `<td><input type="text" maxlength="255" data-col="${c.id_columna}" aria-label="${esc(c.nombre)}"></td>`
-                        : `<td class="centro"><input type="checkbox" data-col="${c.id_columna}" title="${esc(c.etiqueta || c.nombre)}" aria-label="${esc(c.nombre)}"></td>`
+                <tr data-id="${a.IdCuenta}">
+                    <td class="alumno">${esc(a.NombreCompleto)}</td>
+                    ${ctx.columnas.map(c => c.Tipo === 'texto'
+                        ? `<td><input type="text" maxlength="255" data-col="${c.IdColumna}" aria-label="${esc(c.Nombre)}"></td>`
+                        : `<td class="centro"><input type="checkbox" data-col="${c.IdColumna}" title="${esc(c.Etiqueta || c.Nombre)}" aria-label="${esc(c.Nombre)}"></td>`
                     ).join('')}
                 </tr>`).join('');
         }
@@ -213,13 +211,13 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             if (!ctx.columnas.length) { window.notify('warning', 'La administración aún no ha configurado las columnas del reporte.'); return; }
             if (!sem.alumnos.length)  { window.notify('warning', 'No hay alumnos en tu grupo.'); return; }
 
-            clase = { fecha, id_clase: null };
+            clase = { fecha, IdClase: null };
             document.getElementById('claseTitulo').textContent = `${DIAS[iDia]} ${corta(fecha)}`;
             // Clase nueva: sugiere la primera materia que aún no se captura ese día
             if (materiaId === null) {
-                const usadas = sem.clases.filter(c => c.fecha === fecha).map(c => String(c.materia_id));
-                const libre = ctx.materias.find(m => !usadas.includes(String(m.id_materia)));
-                materiaId = (libre || ctx.materias[0]).id_materia;
+                const usadas = sem.clases.filter(c => c.Fecha === fecha).map(c => String(c.IdMateria));
+                const libre = ctx.materias.find(m => !usadas.includes(String(m.IdMateria)));
+                materiaId = (libre || ctx.materias[0]).IdMateria;
             }
             selMateria.value = materiaId;
             pintarTablaAlumnos();
@@ -229,17 +227,17 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
         // Trae tema e incidencias de (día, materia); si no existe, deja todo en blanco
         async function cargarClase() {
-            const d = await getJSON(`${API}?grupo_id=${grupoId}&action=clase&fecha=${clase.fecha}&materia_id=${encodeURIComponent(selMateria.value)}`);
+            const d = await getJSON(`${API}/clase?IdGrupo=${grupoId}&Fecha=${clase.fecha}&IdMateria=${encodeURIComponent(selMateria.value)}`);
             if (!d.success) { window.notify('error', d.message); return; }
-            clase.id_clase = d.id_clase;
+            clase.IdClase = d.IdClase;
             document.getElementById('claseTema').value = d.tema;
-            document.getElementById('btnEliminarClase').style.visibility = d.id_clase ? 'visible' : 'hidden';
+            document.getElementById('btnEliminarClase').style.visibility = d.IdClase ? 'visible' : 'hidden';
             document.querySelectorAll('#claseFilas input').forEach(i => { i.type === 'checkbox' ? i.checked = false : i.value = ''; });
             d.marcas.forEach(m => {
-                const i = document.querySelector(`#claseFilas tr[data-id="${m.cuenta_id}"] input[data-col="${m.columna_id}"]`);
+                const i = document.querySelector(`#claseFilas tr[data-id="${m.IdCuenta}"] input[data-col="${m.IdColumna}"]`);
                 if (!i) return;
-                if (i.type === 'checkbox') i.checked = !!Number(m.marcado);
-                else i.value = m.nota ?? '';
+                if (i.type === 'checkbox') i.checked = !!Number(m.Marcado);
+                else i.value = m.Nota ?? '';
             });
         }
         selMateria.addEventListener('change', cargarClase);
@@ -249,26 +247,27 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             const marcas = [];
             document.querySelectorAll('#claseFilas tr').forEach(tr => {
                 tr.querySelectorAll('input').forEach(i => {
-                    const base = { cuenta_id: Number(tr.dataset.id), columna_id: Number(i.dataset.col) };
-                    if (i.type === 'checkbox') { if (i.checked) marcas.push({ ...base, marcado: 1 }); }
-                    else if (i.value.trim() !== '') marcas.push({ ...base, nota: i.value.trim() });
+                    const base = { IdCuenta: Number(tr.dataset.id), IdColumna: Number(i.dataset.col) };
+                    if (i.type === 'checkbox') { if (i.checked) marcas.push({ ...base, Marcado: 1 }); }
+                    else if (i.value.trim() !== '') marcas.push({ ...base, Nota: i.value.trim() });
                 });
             });
             const fd = new FormData();
-            fd.append('fecha', clase.fecha);
-            fd.append('materia_id', selMateria.value);
-            fd.append('tema', document.getElementById('claseTema').value);
-            fd.append('marcas', JSON.stringify(marcas));
-            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=guardar_clase', { method: 'POST', body: fd });
+            fd.append('IdGrupo', grupoId);
+            fd.append('Fecha', clase.fecha);
+            fd.append('IdMateria', selMateria.value);
+            fd.append('Tema', document.getElementById('claseTema').value);
+            fd.append('Marcas', JSON.stringify(marcas));
+            const d = await getJSON(API + '/guardarClase', { method: 'POST', body: fd });
             window.notifyResponse(d);
             if (d.success) { dlgClase.close(); cargarSemana(sem.inicio); }
         });
 
         document.getElementById('btnEliminarClase').addEventListener('click', async () => {
-            if (!clase.id_clase) return;
+            if (!clase.IdClase) return;
             if (!await window.confirmar('¿Eliminar esta clase y sus incidencias? Ya no saldrá en el reporte.')) return;
-            const fd = new FormData(); fd.append('id_clase', clase.id_clase);
-            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=eliminar_clase', { method: 'POST', body: fd });
+            const fd = new FormData(); fd.append('IdClase', clase.IdClase); fd.append('IdGrupo', grupoId);
+            const d = await getJSON(API + '/eliminarClase', { method: 'POST', body: fd });
             window.notifyResponse(d);
             if (d.success) { dlgClase.close(); cargarSemana(sem.inicio); }
         });
@@ -276,14 +275,14 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         /* ---------------- Envío ---------------- */
 
         function estadoHTML(a) {
-            if (!a.tiene_correo) return '<span class="rep-pill sin">Sin correo</span>';
-            if (a.enviado_en)    return `<span class="rep-pill ok">Enviado ${corta(a.enviado_en.slice(0, 10))} ${a.enviado_en.slice(11, 16)}</span>`;
+            if (!a.TieneCorreo) return '<span class="rep-pill sin">Sin correo</span>';
+            if (a.EnviadoEn)    return `<span class="rep-pill ok">Enviado ${corta(a.EnviadoEn.slice(0, 10))} ${a.EnviadoEn.slice(11, 16)}</span>`;
             return '<span class="rep-pill pend">Pendiente</span>';
         }
 
         function pintarEnvio() {
-            const conCorreo = sem.alumnos.filter(a => a.tiene_correo).length;
-            const enviados  = sem.alumnos.filter(a => a.enviado_en).length;
+            const conCorreo = sem.alumnos.filter(a => a.TieneCorreo).length;
+            const enviados  = sem.alumnos.filter(a => a.EnviadoEn).length;
             document.getElementById('envioResumen').textContent =
                 `${sem.clases.length} clase(s) capturada(s) · ${enviados} de ${conCorreo} reportes enviados`
                 + (conCorreo < sem.alumnos.length ? ` · ${sem.alumnos.length - conCorreo} alumno(s) sin correo` : '');
@@ -293,11 +292,11 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
             sem.alumnos.forEach(a => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td class="alumno">${esc(a.nombre_completo)}</td>
+                    <td class="alumno">${esc(a.NombreCompleto)}</td>
                     <td class="estado">${estadoHTML(a)}</td>
                     <td class="rep-fila-acc">
                         <button type="button" class="btn-guardar claro previa">Vista previa</button>
-                        <button type="button" class="btn-guardar enviar" ${a.tiene_correo ? '' : 'disabled'}>${a.enviado_en ? 'Reenviar' : 'Enviar'}</button>
+                        <button type="button" class="btn-guardar enviar" ${a.TieneCorreo ? '' : 'disabled'}>${a.EnviadoEn ? 'Reenviar' : 'Enviar'}</button>
                     </td>`;
                 tr.querySelector('.previa').addEventListener('click', () => vistaPrevia(a));
                 tr.querySelector('.enviar').addEventListener('click', async (e) => {
@@ -311,7 +310,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         }
 
         async function vistaPrevia(a) {
-            const d = await getJSON(`${API}?grupo_id=${grupoId}&action=vista_previa&cuenta_id=${a.id_cuenta}&inicio=${sem.inicio}`);
+            const d = await getJSON(`${API}/vistaPrevia?IdGrupo=${grupoId}&IdCuenta=${a.IdCuenta}&Inicio=${sem.inicio}`);
             if (!d.success) { window.notify('error', d.message); return; }
             document.getElementById('previaAsunto').textContent = d.asunto;
             dlgPrevia.showModal();
@@ -326,22 +325,23 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
         async function enviarUno(a) {
             const fd = new FormData();
-            fd.append('cuenta_id', a.id_cuenta);
-            fd.append('inicio', sem.inicio);
-            const d = await getJSON(API + '?grupo_id=' + grupoId + '&action=enviar', { method: 'POST', body: fd });
-            if (d.success) a.enviado_en = d.enviado_en;
+            fd.append('IdCuenta', a.IdCuenta);
+            fd.append('IdGrupo', grupoId);
+            fd.append('Inicio', sem.inicio);
+            const d = await getJSON(API + '/enviar', { method: 'POST', body: fd });
+            if (d.success) a.EnviadoEn = d.EnviadoEn;
             return d;
         }
 
         // Un correo por petición: así se ve el avance y ninguna petición se pasa de tiempo
         document.getElementById('btnEnviarTodos').addEventListener('click', async (e) => {
             const btn = e.currentTarget;
-            const lista = sem.alumnos.filter(a => a.tiene_correo);
+            const lista = sem.alumnos.filter(a => a.TieneCorreo);
             if (!sem.clases.length) { window.notify('warning', 'No hay clases capturadas en esta semana.'); return; }
             if (!lista.length)      { window.notify('warning', 'Ningún alumno tiene correo de tutor registrado.'); return; }
 
             const sin = sem.alumnos.length - lista.length;
-            const yaEnviados = lista.filter(a => a.enviado_en).length;
+            const yaEnviados = lista.filter(a => a.EnviadoEn).length;
             let msg = `Se enviará el reporte de la semana del ${document.getElementById('semLbl').textContent} a los papás de ${lista.length} alumno(s).`;
             if (yaEnviados) msg += ` ${yaEnviados} ya lo recibieron y les llegará de nuevo.`;
             if (sin)        msg += ` ${sin} alumno(s) no tienen correo y se omiten.`;

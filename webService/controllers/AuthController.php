@@ -1,46 +1,54 @@
 <?php
+require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt(): la matrícula se guarda encriptada
 
 /**
- * Recurso: auth.  Ruta: /api/auth?action=login|logout
- * Autenticación por matrícula (permiso: 1 admin · 2 maestro · 3 padre · 4 dev).
+ * Acceso a la plataforma. Se entra con la matrícula (no hay contraseña).
+ *   /auth/entrar  → pantalla de inicio de sesión · POST inicia sesión
+ *   /auth/salir   → cierra la sesión
+ * La URL anterior /inicio-sesion redirige a /auth/entrar (index.php raíz).
  */
-class AuthController
+class AuthController extends Controller
 {
-    private AuthBusiness $auth;
-
-    public function __construct(mysqli $conexion)
+    /** Aquí todavía no hay sesión que exigir: la pantalla acepta GET y todo lo demás es POST. */
+    public function authorize(string $action): void
     {
-        $this->auth = new AuthBusiness($conexion);
+        if ($action === 'entrar' && $this->method === 'GET') return;
+        $this->requirePost();
     }
 
-    public function login(): void
+    public function entrar(string $Matricula = ''): void
     {
-        $matricula = trim($_POST['matricula'] ?? '');
-        if ($matricula === '') response(400, false, 'Ingresa tu matrícula.');
+        if ($this->method === 'GET') {
+            if ($this->user() !== null) $this->redirect(self::homeOf($this->roleId()));   // ya entró: a su panel
+            $this->view('site/inicio_sesion');
+            return;
+        }
 
-        $row = $this->auth->autenticar($matricula);
-        if (!$row) response(401, false, 'ID incorrecto. Verifica tu matrícula.');
+        $this->ensure($Matricula !== '', 'Ingresa tu matrícula.');
 
-        $permiso = (int) $row['permiso_id'];
-        $_SESSION['usuario'] = trim($row['nombre'] . ' ' . $row['paterno']);
-        $_SESSION['permiso'] = $permiso;
-        $_SESSION['id']      = (int) $row['usuario_id'];
+        $this->api->command('Auth', 'Auth', 'Authenticate');
+        $this->api->addParameter('Matricula', 'S', encrypt($Matricula));   // se encripta y se compara: la base nunca la tiene en claro
+        $result = $this->api->execute();
 
-        $destinos = [
-            1 => BASE_URL . '/administrador',
-            2 => BASE_URL . '/maestro',
-            3 => BASE_URL . '/padre',
-            4 => BASE_URL . '/desarrollador',
-        ];
-        $redirect = $destinos[$permiso] ?? BASE_URL . '/';
+        if (!$result->status()) {
+            $this->ensure($result->row() !== null, 'ID incorrecto. Verifica tu matrícula.', 401);
+            $sesion = Sesion::fromRow($result->row());
 
-        response(200, true, 'Bienvenido, ' . $_SESSION['usuario'] . '.', ['redirect' => $redirect]);
+            session_regenerate_id(true);
+            $_SESSION['usuario'] = $sesion->displayName();
+            $_SESSION['permiso'] = $sesion->IdPermiso;
+            $_SESSION['id']      = $sesion->IdUsuario;
+
+            $this->success('Bienvenido, ' . $sesion->displayName() . '.', ['redirect' => self::homeOf($sesion->IdPermiso)]);
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function logout(): void
+    public function salir(): void
     {
         $_SESSION = [];
         session_destroy();
-        response(200, true, 'Sesión cerrada.', ['redirect' => BASE_URL . '/inicio-sesion']);
+        $this->success('Sesión cerrada.', ['redirect' => '/auth/entrar']);
     }
 }

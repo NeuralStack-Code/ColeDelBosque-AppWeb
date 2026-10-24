@@ -1,20 +1,34 @@
 <?php
-
 /**
- * Recurso: dashboard.  Ruta: /api/dashboard?action=resumen  (solo admin).
+ * Panel del administrador: su pantalla de inicio.
+ *   /dashboard/index    → pantalla del panel
+ *   /dashboard/resumen  → sus números (totales, saldo, pagos y alumnos por grupo)
+ * La URL anterior /administrador redirige a /dashboard/index (index.php raíz).
  */
-class DashboardController
+class DashboardController extends Controller
 {
-    private DashboardBusiness $dash;
+    protected int $role = self::ADMIN;
+    protected array $readActions = ['index', 'resumen'];
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireAdmin();
-        $this->dash = new DashboardBusiness($conexion);
+        $this->view('admin/home', ['nombre' => $this->user() ?? 'Administrador']);
     }
 
     public function resumen(): void
     {
-        response(200, true, 'Métricas obtenidas.', $this->dash->resumen());
+        $this->api->command('Dashboard', 'Dashboard', 'Summary');
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $resumen = DashboardResumen::fromRow($result->row() ?? []);
+
+        $this->api->command('Dashboard', 'Dashboard', 'StudentsByGroup');
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Métricas obtenidas.', ['resumen' => $resumen, 'alumnosPorGrupo' => GrupoConteo::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
+        }
     }
 }

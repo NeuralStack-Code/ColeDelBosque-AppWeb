@@ -1,33 +1,43 @@
 <?php
+require_once dirname(__DIR__, 2) . '/apiService/core/mail.php';   // enviarCorreo() → api central
 
 /**
- * Recurso: contacto.  Ruta: /api/contacto (POST, sin action → index).
- * Envía el mensaje del formulario de contacto por correo.
+ * Contacto: cualquiera puede escribirle al colegio, sin cuenta.
+ *   /contacto/index   → pantalla de contacto
+ *   /contacto/enviar  → manda el mensaje por correo al colegio
+ * No guarda nada en la base: el mensaje sale por la api central (correo centralizado, sin SMTP local).
  */
-class ContactoController
+class ContactoController extends Controller
 {
-    private ContactoBusiness $contacto;
+    /** No usa la base. */
+    public const CONNECTION = 'ninguna';
 
-    public function __construct(?mysqli $conexion = null)
-    {
-        $this->contacto = new ContactoBusiness();
-    }
+    protected array $publicActions = ['index', 'enviar'];
 
     public function index(): void
     {
-        $nombre = trim($_POST['nombre'] ?? '');
-        $tel    = trim($_POST['tel']    ?? '');
-        $coment = trim($_POST['coment'] ?? '');
+        // El administrador y el desarrollador trabajan en su panel.
+        if (in_array($this->roleId(), [self::ADMIN, self::DEVELOPER], true)) $this->redirect(self::homeOf($this->roleId()));
+        $this->view('site/contacto');
+    }
 
-        if ($nombre === '' || $tel === '' || $coment === '') {
-            response(400, false, 'Completa todos los campos.');
-        }
+    public function enviar(string $Nombre = '', string $Telefono = '', string $Comentario = ''): void
+    {
+        $this->ensure($Nombre !== '' && $Telefono !== '' && $Comentario !== '', 'Completa todos los campos.');
+        $this->ensure((bool) preg_match('/^.{1,100}$/us', $Nombre) && (bool) preg_match('/^.{1,30}$/us', $Telefono),
+                      'El nombre admite máximo 100 caracteres y el teléfono 30.');
+        $this->ensure((bool) preg_match('/^.{1,3000}$/us', $Comentario), 'El comentario admite máximo 3000 caracteres.');
 
-        try {
-            $this->contacto->enviar($nombre, $tel, $coment);
-            response(200, true, 'Se ha enviado tu mensaje. Nos comunicaremos contigo en breve.');
-        } catch (\Throwable $e) {
-            error_log('Mail error (contacto): ' . $e->getMessage());
+        // A quién le llega (no es una credencial): lo define el proyecto en su .env.
+        $to    = $_ENV['MAIL_TO'] ?? ($_ENV['MAIL_FROM'] ?? '');
+        $error = $to === '' ? 'Falta MAIL_TO en el .env.' : enviarCorreo(
+            $to, CorreoContacto::SUBJECT, CorreoContacto::body($Nombre, $Telefono, $Comentario),
+            ['altBody' => CorreoContacto::text($Nombre, $Telefono, $Comentario)]);
+
+        if ($error === '') {
+            $this->success('Se ha enviado tu mensaje. Nos comunicaremos contigo en breve.');
+        } else {
+            error_log('[Colegio contacto] ' . $error);
             response(500, false, 'No se pudo enviar el mensaje. Intenta más tarde.');
         }
     }

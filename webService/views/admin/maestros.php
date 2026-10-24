@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de maestros. La pinta DocenteController::index(). Recibe $base. Su JavaScript llama a /docente/<método> (y a /grupo/listar). */
 $title = 'Maestros | Admin';
 $extraCss = ['admin.css'];
 $extraJs = ['matricula.js'];
@@ -15,7 +13,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -23,7 +21,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -81,7 +79,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/control-escolar';
+        const API = window.BASE_URL + '/docente';
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
@@ -90,21 +88,21 @@ $img = $base . '/webService/wwwroot/img';
         let todos = [];
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         async function cargarGrupos() {
-            const d = await (await fetch(API + '?action=grupos_listar')).json();
-            grupos = d.items || [];
-            const opts = grupos.map(g => `<option value="${g.id_grupo}">${g.grado}</option>`).join('');
+            const d = await (await fetch(window.BASE_URL + '/grupo/listar')).json();
+            grupos = d.data?.items || [];
+            const opts = grupos.map(g => `<option value="${g.IdGrupo}">${g.Grado}</option>`).join('');
             document.getElementById('grado').innerHTML = opts + '<option value="0">Sin grupo (solo inglés)</option>';
             document.getElementById('fGrupo').innerHTML = '<option value="">Todos</option>' + opts;
         }
 
         async function cargarMaestros() {
-            const d = await (await fetch(API + '?action=maestros_listar')).json();
-            todos = d.items || [];
+            const d = await (await fetch(API + '/listar')).json();
+            todos = d.data?.items || [];
             render();
         }
 
@@ -113,9 +111,9 @@ $img = $base . '/webService/wwwroot/img';
             const nom = document.getElementById('fNom').value.toLowerCase();
             const grp = document.getElementById('fGrupo').value;
             const f = todos.filter(m => {
-                if (mat && !(m.matricula || '').toLowerCase().includes(mat)) return false;
-                if (nom && !`${m.nombre} ${m.paterno} ${m.materno ?? ''}`.toLowerCase().includes(nom)) return false;
-                if (grp && String(m.grupo_id) !== grp) return false;
+                if (mat && !(m.Matricula || '').toLowerCase().includes(mat)) return false;
+                if (nom && !`${m.Nombre} ${m.Paterno} ${m.Materno ?? ''}`.toLowerCase().includes(nom)) return false;
+                if (grp && String(m.IdGrupo) !== grp) return false;
                 return true;
             });
             filas.innerHTML = '';
@@ -123,9 +121,9 @@ $img = $base . '/webService/wwwroot/img';
             f.forEach(m => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${m.matricula ?? ''}</td>
-                    <td>${m.nombre} ${m.paterno} ${m.materno ?? ''}</td>
-                    <td>${m.grado ?? '—'}</td>
+                    <td>${m.Matricula ?? ''}</td>
+                    <td>${m.Nombre} ${m.Paterno} ${m.Materno ?? ''}</td>
+                    <td>${m.Grado ?? '—'}</td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
@@ -157,14 +155,14 @@ $img = $base . '/webService/wwwroot/img';
         }
         function abrirEdicion(m) {
             document.getElementById('modalTitulo').textContent = 'Editar maestro';
-            document.getElementById('id_cuenta').value = m.id_cuenta;
-            document.getElementById('nombre').value = m.nombre;
-            document.getElementById('paterno').value = m.paterno;
-            document.getElementById('materno').value = m.materno ?? '';
-            document.getElementById('matricula').value = m.matricula ?? '';
+            document.getElementById('id_cuenta').value = m.IdCuenta;
+            document.getElementById('nombre').value = m.Nombre;
+            document.getElementById('paterno').value = m.Paterno;
+            document.getElementById('materno').value = m.Materno ?? '';
+            document.getElementById('matricula').value = m.Matricula ?? '';
             mat.desactivar();   // al editar no se regenera: es su clave de acceso
-            document.getElementById('grado').value = Number(m.grupo_id) > 0 ? m.grupo_id : '0';
-            marcarNiveles(m.niveles_ingles);
+            document.getElementById('grado').value = Number(m.IdGrupo) > 0 ? m.IdGrupo : '0';
+            marcarNiveles(m.NivelesIngles);
             modal.showModal();
         }
 
@@ -172,27 +170,27 @@ $img = $base . '/webService/wwwroot/img';
             e.preventDefault();
             const id = document.getElementById('id_cuenta').value;
             const fd = new FormData();
-            fd.append('nombre', nombre.value);
-            fd.append('paterno', paterno.value);
-            fd.append('materno', materno.value);
-            fd.append('matricula', matricula.value);
-            fd.append('grado', grado.value);
-            fd.append('niveles_ingles', JSON.stringify(nivelesMarcados()));
-            if (grado.value === '0') fd.append('sin_grupo', '1');
+            // Cada campo viaja con el nombre de la propiedad del model Persona; los niveles marcados, como Niveles[]
+            fd.append('Nombre', nombre.value);
+            fd.append('Paterno', paterno.value);
+            fd.append('Materno', materno.value);
+            fd.append('Matricula', matricula.value);
+            fd.append('IdGrupo', grado.value);
+            nivelesMarcados().forEach(n => fd.append('Niveles[]', n));
+            if (grado.value === '0') fd.append('SinGrupo', '1');
             if (grado.value === '0' && !nivelesMarcados().length) {
                 window.notify('error', 'Selecciona un grupo o marca los niveles de inglés que imparte.'); return;
             }
-            let accion = 'maestro_crear';
-            if (id) { accion = 'maestro_editar'; fd.append('id_cuenta', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
+            if (id) fd.append('IdCuenta', id);
+            const d = await (await fetch(API + '/guardar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) { modal.close(); cargarMaestros(); }
         });
 
         async function eliminar(m) {
-            if (!await window.confirmar(`¿Eliminar a ${m.nombre} ${m.paterno}? Se desasignará de su grupo y se borrarán sus registros. Esta acción no se puede deshacer.`)) return;
-            const fd = new FormData(); fd.append('id_cuenta', m.id_cuenta);
-            const d = await (await fetch(API + '?action=maestro_eliminar', { method: 'POST', body: fd })).json();
+            if (!await window.confirmar(`¿Eliminar a ${m.Nombre} ${m.Paterno}? Se desasignará de su grupo y se borrarán sus registros. Esta acción no se puede deshacer.`)) return;
+            const fd = new FormData(); fd.append('IdCuenta', m.IdCuenta);
+            const d = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargarMaestros();
         }

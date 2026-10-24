@@ -1,7 +1,5 @@
 <?php
-$rol = 1;
-require __DIR__ . '/../partials/guard.php';
-$base = BASE_URL;
+/** Pantalla de columnas del reporte semanal. La pinta ReporteColumnaController::index(). Recibe $base. Su JavaScript llama a /reportecolumna/<método>. */
 $title = 'Reporte semanal | Admin';
 $extraCss = ['admin.css'];
 $img = $base . '/webService/wwwroot/img';
@@ -14,7 +12,7 @@ $img = $base . '/webService/wwwroot/img';
 
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/administrador" class="marca">
+            <a href="<?= $base ?>/dashboard/index" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
                 <span>Colegio del Bosque<small>Panel de administración</small></span>
             </a>
@@ -22,7 +20,7 @@ $img = $base . '/webService/wwwroot/img';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/administrador">
+    <a class="volver-panel" href="<?= $base ?>/dashboard/index">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>
@@ -72,7 +70,7 @@ $img = $base . '/webService/wwwroot/img';
     </dialog>
 
     <script>
-        const API = window.BASE_URL + '/api/reporte-columnas';
+        const API = window.BASE_URL + '/reportecolumna';
         const filas = document.getElementById('filas');
         const vacio = document.getElementById('vacio');
         const modal = document.getElementById('modal');
@@ -81,8 +79,8 @@ $img = $base . '/webService/wwwroot/img';
         const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
         function cerrarSesion() {
-            fetch(window.BASE_URL + '/api/auth?action=logout', { method: 'POST' })
-                .finally(() => location.href = window.BASE_URL + '/inicio-sesion');
+            fetch(window.BASE_URL + '/auth/salir', { method: 'POST' })
+                .finally(() => location.href = window.BASE_URL + '/auth/entrar');
         }
 
         // La etiqueta solo aplica a casillas
@@ -92,19 +90,19 @@ $img = $base . '/webService/wwwroot/img';
         tipo.addEventListener('change', verEtiqueta);
 
         async function cargar() {
-            const d = await (await fetch(API + '?action=listar')).json();
+            const d = await (await fetch(API + '/listar')).json();
             if (!d.success) { window.notify('error', d.message); return; }
-            const items = d.items || [];
+            const items = d.data.items || [];
             filas.innerHTML = '';
             vacio.style.display = items.length ? 'none' : 'block';
             items.forEach(c => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>${c.orden}</td>
-                    <td><strong>${esc(c.nombre)}</strong></td>
-                    <td>${c.tipo === 'texto' ? 'Texto' : 'Casilla'}</td>
-                    <td>${c.tipo === 'texto' ? '<span style="color:var(--texto-suave)">Lo que escriba la maestra</span>' : esc(c.etiqueta || 'Sí')}</td>
-                    <td><span class="badge-estatus ${c.activo ? 'pagado' : 'pendiente'}">${c.activo ? 'Activa' : 'Oculta'}</span></td>
+                    <td>${c.Orden}</td>
+                    <td><strong>${esc(c.Nombre)}</strong></td>
+                    <td>${c.Tipo === 'texto' ? 'Texto' : 'Casilla'}</td>
+                    <td>${c.Tipo === 'texto' ? '<span style="color:var(--texto-suave)">Lo que escriba la maestra</span>' : esc(c.Etiqueta || 'Sí')}</td>
+                    <td><span class="badge-estatus ${c.Activo ? 'pagado' : 'pendiente'}">${c.Activo ? 'Activa' : 'Oculta'}</span></td>
                     <td><div class="acciones">
                         <button class="icon-btn editar" title="Editar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg></button>
                         <button class="icon-btn borrar" title="Eliminar"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></button>
@@ -122,12 +120,12 @@ $img = $base . '/webService/wwwroot/img';
         }
         function abrirEdicion(c) {
             document.getElementById('modalTitulo').textContent = 'Editar columna';
-            document.getElementById('id_columna').value = c.id_columna;
-            document.getElementById('nombre').value = c.nombre;
-            tipo.value = c.tipo;
-            document.getElementById('etiqueta').value = c.etiqueta ?? '';
-            document.getElementById('orden').value = c.orden;
-            document.getElementById('activo').value = c.activo ? '1' : '0';
+            document.getElementById('id_columna').value = c.IdColumna;
+            document.getElementById('nombre').value = c.Nombre;
+            tipo.value = c.Tipo;
+            document.getElementById('etiqueta').value = c.Etiqueta ?? '';
+            document.getElementById('orden').value = c.Orden;
+            document.getElementById('activo').value = c.Activo ? '1' : '0';
             verEtiqueta(); modal.showModal();
         }
 
@@ -135,18 +133,19 @@ $img = $base . '/webService/wwwroot/img';
             e.preventDefault();
             const id = document.getElementById('id_columna').value;
             const fd = new FormData();
-            ['nombre', 'tipo', 'etiqueta', 'orden', 'activo'].forEach(f => fd.append(f, document.getElementById(f).value));
-            let accion = 'crear';
-            if (id) { accion = 'editar'; fd.append('id_columna', id); }
-            const d = await (await fetch(API + '?action=' + accion, { method: 'POST', body: fd })).json();
+            // Cada campo viaja con el nombre de la propiedad del model ReporteColumna
+            const campos = { Nombre: 'nombre', Tipo: 'tipo', Etiqueta: 'etiqueta', Orden: 'orden', Activo: 'activo' };
+            Object.entries(campos).forEach(([campo, input]) => fd.append(campo, document.getElementById(input).value));
+            if (id) fd.append('IdColumna', id);
+            const d = await (await fetch(API + '/guardar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) { modal.close(); cargar(); }
         });
 
         async function eliminar(c) {
-            if (!await window.confirmar(`¿Eliminar la columna "${c.nombre}"?`)) return;
-            const fd = new FormData(); fd.append('id_columna', c.id_columna);
-            const d = await (await fetch(API + '?action=eliminar', { method: 'POST', body: fd })).json();
+            if (!await window.confirmar(`¿Eliminar la columna "${c.Nombre}"?`)) return;
+            const fd = new FormData(); fd.append('IdColumna', c.IdColumna);
+            const d = await (await fetch(API + '/eliminar', { method: 'POST', body: fd })).json();
             window.notifyResponse(d);
             if (d.success) cargar();
         }

@@ -1,56 +1,69 @@
 <?php
-
 /**
- * Recurso: tipos-recibo.  Ruta: /api/tipos-recibo?action=listar|crear|editar|eliminar
- * Catálogo de tipos de recibo (solo admin).
+ * Tipos de recibo (solo el administrador).
+ *   /tiporecibo/index     → pantalla del catálogo
+ *   /tiporecibo/listar    → los tipos
+ *   /tiporecibo/guardar   → alta o cambio
+ *   /tiporecibo/eliminar  → baja (si no hay recibos de ese tipo)
+ * La URL anterior /administrador/tipos-recibo redirige a /tiporecibo/index (index.php raíz).
  */
-class TipoReciboController
+class TipoReciboController extends Controller
 {
-    private TipoReciboBusiness $tipos;
+    protected int $role = self::ADMIN;
 
-    public function __construct(mysqli $conexion)
+    public function index(): void
     {
-        requireAdmin();
-        $this->tipos = new TipoReciboBusiness($conexion);
-    }
-
-    /** naturaleza solo puede ser ingreso o gasto. */
-    private function naturaleza(string $n): string
-    {
-        return $n === 'gasto' ? 'gasto' : 'ingreso';
+        $this->view('admin/tipos_recibo');
     }
 
     public function listar(): void
     {
-        response(200, true, 'Tipos obtenidos.', ['items' => $this->tipos->listar()]);
+        $this->api->command('Tipos_recibo', 'TipoRecibo', 'List');
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            $this->success('Tipos obtenidos.', ['items' => TipoRecibo::fromTable($result->table())]);
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function crear(): void
+    /** Sin IdTipo es un alta; con él, un cambio. */
+    public function guardar(TipoRecibo $tipo): void
     {
-        $nombre = trim($_POST['nombre'] ?? '');
-        $nat    = $this->naturaleza($_POST['naturaleza'] ?? 'ingreso');
-        if ($nombre === '') response(400, false, 'El nombre es obligatorio.');
-        if (!$this->tipos->crear($nombre, $nat)) response(500, false, 'No se pudo crear el tipo.');
-        response(201, true, 'Tipo de recibo creado.');
+        $this->ensure($tipo->Nombre !== '', 'El nombre es obligatorio.');
+        $this->ensure((bool) preg_match('/^.{1,50}$/us', $tipo->Nombre), 'El nombre admite máximo 50 caracteres.');
+        $this->ensure(in_array($tipo->Naturaleza, TipoRecibo::NATURES, true), 'La naturaleza debe ser ingreso o gasto.');
+
+        if (!$tipo->IdTipo) {
+            $this->api->command('Tipos_recibo', 'TipoRecibo', 'Insert');
+        } else {
+            $this->api->command('Tipos_recibo', 'TipoRecibo', 'Update');
+            $this->api->addParameter('IdTipo', 'I', $tipo->IdTipo);
+        }
+        $this->api->addParameter('Nombre',     'S', $tipo->Nombre);
+        $this->api->addParameter('Naturaleza', 'S', $tipo->Naturaleza);
+        $result = $this->api->execute();
+
+        if (!$result->status()) {
+            if (!$tipo->IdTipo) $this->success('Tipo de recibo creado.', ['IdTipo' => $result->id()], 201);
+            $this->success('Tipo de recibo actualizado.');
+        } else {
+            $this->failure($result);
+        }
     }
 
-    public function editar(): void
+    public function eliminar(int $IdTipo): void
     {
-        $id     = (int) ($_POST['id_tipo'] ?? 0);
-        $nombre = trim($_POST['nombre'] ?? '');
-        $nat    = $this->naturaleza($_POST['naturaleza'] ?? 'ingreso');
-        if ($id <= 0)       response(400, false, 'Registro no válido.');
-        if ($nombre === '') response(400, false, 'El nombre es obligatorio.');
-        if (!$this->tipos->editar($id, $nombre, $nat)) response(500, false, 'No se pudo actualizar el tipo.');
-        response(200, true, 'Tipo de recibo actualizado.');
-    }
+        $this->api->command('Tipos_recibo', 'TipoRecibo', 'Delete');
+        $this->api->addParameter('IdTipo', 'I', $IdTipo);
+        $result = $this->api->execute();
 
-    public function eliminar(): void
-    {
-        $id = (int) ($_POST['id_tipo'] ?? 0);
-        if ($id <= 0) response(400, false, 'Registro no válido.');
-        if ($this->tipos->tieneRecibos($id)) response(409, false, 'No se puede eliminar: hay recibos con este tipo.');
-        $this->tipos->eliminar($id);
-        response(200, true, 'Tipo de recibo eliminado.');
+        if (!$result->status()) {
+            $this->ensure($result->affected() > 0, 'No se encontró el tipo de recibo.', 404);
+            $this->success('Tipo de recibo eliminado.');
+        } else {
+            $this->failure($result);
+        }
     }
 }

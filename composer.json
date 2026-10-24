@@ -10,7 +10,8 @@
         "classmap": [
             "webService/controllers",
             "webService/business",
-            "webService/models"
+            "webService/models",
+            "webService/libs"
         ]
     },
     "config": {
