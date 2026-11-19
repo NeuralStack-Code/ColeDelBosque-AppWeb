@@ -6,12 +6,11 @@
  *   /grupo/detalle   → un grupo con sus materias, las maestras y los ciclos para el formulario
  *   /grupo/guardar   → alta o cambio, con sus materias (las nuevas se agregan al catálogo)
  *   /grupo/eliminar  → baja (sus alumnos quedan "sin grupo")
- * La URL anterior /administrador/grupos redirige a /grupo/index (index.php raíz).
+ * La URL anterior /administrador/grupos redirige a /grupo/index (tabla Rutas).
  */
 class GrupoController extends Controller
 {
-    protected int $role = self::ADMIN;
-    protected array $readActions = ['index', 'listar', 'detalle'];
+    public const MODULE = 'escolar';
 
     public function index(): void
     {
@@ -20,7 +19,7 @@ class GrupoController extends Controller
 
     public function listar(int $IdCiclo = 0): void
     {
-        $this->api->command('Control_escolar', 'Grupo', 'List');
+        $this->api->command('Escolar', 'Grupo', 'List');
         $this->api->addParameter('IdCiclo', 'I', $IdCiclo);
         $result = $this->api->execute();
 
@@ -33,25 +32,25 @@ class GrupoController extends Controller
 
     public function detalle(int $IdGrupo): void
     {
-        $this->api->command('Control_escolar', 'Grupo', 'Get');
+        $this->api->command('Escolar', 'Grupo', 'Get');
         $this->api->addParameter('IdGrupo', 'I', $IdGrupo);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $this->ensure($result->row() !== null, 'No se encontró el grupo.', 404);
         $grupo = Grupo::fromRow($result->row());
 
-        $this->api->command('Control_escolar', 'Grupo', 'Subjects');
+        $this->api->command('Escolar', 'Grupo', 'Subjects');
         $this->api->addParameter('IdGrupo', 'I', $IdGrupo);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $materias = MateriaOpcion::fromTable($result->table());
 
-        $this->api->command('Control_escolar', 'Grupo', 'Teachers');
+        $this->api->command('Escolar', 'Grupo', 'Teachers');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $maestros = PersonaOpcion::fromTable($result->table());
 
-        $this->api->command('Ciclos', 'Ciclo', 'List');
+        $this->api->command('Escolar', 'Ciclo', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -76,7 +75,7 @@ class GrupoController extends Controller
             $this->ensure($grupo->Grado !== '', 'Indica el grado del grupo.');
             $this->ensure($ids !== [] || $nuevas !== [], 'Agrega al menos una materia.');
 
-            $this->api->command('Control_escolar', 'Grupo', 'Insert');
+            $this->api->command('Escolar', 'Grupo', 'Insert');
             $this->api->addParameter('Grado',          'S', $grupo->Grado);
             $this->api->addParameter('IdCiclo',        'I', $grupo->IdCiclo ?: null);
             $this->api->addParameter('Nivel',          'I', $grupo->Nivel);
@@ -88,7 +87,7 @@ class GrupoController extends Controller
             $this->success('¡Se ha creado el grupo y sus materias!', ['IdGrupo' => $result->id()], 201);
         }
 
-        $this->api->command('Control_escolar', 'Grupo', 'Update');
+        $this->api->command('Escolar', 'Grupo', 'Update');
         $this->api->addParameter('IdGrupo',            'I', $grupo->IdGrupo);
         $this->api->addParameter('Grado',              'S', $grupo->Grado !== '' ? $grupo->Grado : null);
         $this->api->addParameter('IdMaestra',          'I', $grupo->IdMaestra ?: null);
@@ -110,7 +109,7 @@ class GrupoController extends Controller
 
     public function eliminar(int $IdGrupo): void
     {
-        $this->api->command('Control_escolar', 'Grupo', 'Delete');
+        $this->api->command('Escolar', 'Grupo', 'Delete');
         $this->api->addParameter('IdGrupo', 'I', $IdGrupo);
         $result = $this->api->execute();
 

@@ -10,10 +10,54 @@
  *
  * Reemplaza SOLO el core (apiService/core: Command, Entity, Model, ServerApi, Crypto, procedure y este actualizador) y los
  * procedures del sistema (webService/sql/sp). Tu Controller base, tu autoload, tu router, tus controllers, business,
- * models, vistas y tu .env no se tocan. De lo reemplazado queda copia en storage/framework-backup/.
+ * models, vistas y tu .env no se tocan. De lo reemplazado queda copia en apiService/storage/framework-backup/ (o en
+ * storage/framework-backup/ en un proyecto anterior a la estructura de la 1.4.0).
  */
 
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }    // solo por consola, nunca desde el navegador
+
+/**
+ * Llave pública (Ed25519) con la que NeuralStack firma cada versión del framework (1.5.0). El paquete trae
+ * MANIFEST.json (el SHA-256 de cada archivo) y MANIFEST.sig (su firma): si la firma no valida o un solo archivo no
+ * coincide, no se escribe nada. La llave privada nunca está en el servidor de la api.
+ */
+const FRAMEWORK_PUBLIC_KEY = 'NMmEpu6RL8OPjhl3har9mS6XVqZlWT5taR2k+rDU5FU=';
+
+/**
+ * Revisa un paquete de actualización antes de tocar el proyecto. Regresa null si es auténtico, o el motivo del rechazo.
+ * Auténtico = MANIFEST.json firmado con FRAMEWORK_PUBLIC_KEY, de la versión $version, y cada archivo del paquete
+ * (fuera del manifiesto mismo) listado en él con el mismo SHA-256, sin que falte ninguno.
+ */
+function frameworkVerifyPackage(ZipArchive $zip, string $version, string $publicKey = FRAMEWORK_PUBLIC_KEY): ?string
+{
+    if (!function_exists('sodium_crypto_sign_verify_detached')) {
+        return "Falta la extensión 'sodium' de PHP: sin ella no se puede comprobar la firma del paquete.";
+    }
+    $manifest  = $zip->getFromName('MANIFEST.json');
+    $signature = base64_decode((string) $zip->getFromName('MANIFEST.sig'), true);
+    $key       = base64_decode($publicKey, true);
+    if ($manifest === false || $signature === false || strlen($signature) !== SODIUM_CRYPTO_SIGN_BYTES) return 'el paquete no viene firmado.';
+    if ($key === false || strlen($key) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) return 'la llave pública del actualizador no es válida.';
+    if (!sodium_crypto_sign_verify_detached($signature, $manifest, $key)) return 'la firma del manifiesto no es válida.';
+
+    $data = json_decode($manifest, true);
+    if (!is_array($data) || !is_array($data['files'] ?? null)) return 'el manifiesto no se puede leer.';
+    if (($data['version'] ?? '') !== $version) return "el manifiesto es de la versión '" . ($data['version'] ?? '') . "', no de la $version.";
+
+    $seen = [];
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $path = $zip->getNameIndex($i);
+        if ($path === 'MANIFEST.json' || $path === 'MANIFEST.sig' || str_ends_with($path, '/')) continue;
+        $hash = $data['files'][$path] ?? null;
+        if ($hash === null) return "$path no está en el manifiesto.";
+        if (!hash_equals($hash, hash('sha256', (string) $zip->getFromIndex($i)))) return "$path no coincide con el manifiesto (alterado).";
+        $seen[$path] = true;
+    }
+    foreach (array_keys($data['files']) as $path) {
+        if (!isset($seen[$path])) return "falta $path en el paquete.";
+    }
+    return null;
+}
 
 /** Pide algo a la api con la API key del proyecto. Devuelve el cuerpo (o false si no hubo respuesta). */
 function frameworkRequest(string $url, string $apiKey, string $accept): string|false
@@ -76,8 +120,17 @@ function updateFramework(string $root, string $apiBase, string $apiKey, bool $fo
     file_put_contents($tmpZip, $bytes);
     $zip = new ZipArchive();
     if ($zip->open($tmpZip) !== true) { @unlink($tmpZip); return $fail('Error al abrir el paquete descargado.'); }
+    // Firma y huellas ANTES de escribir nada: un paquete alterado no toca el proyecto.
+    if (($problem = frameworkVerifyPackage($zip, $latest)) !== null) {
+        $zip->close();
+        @unlink($tmpZip);
+        return $fail("Paquete rechazado: $problem No se cambió nada.");
+    }
+    echo "  Firma del paquete verificada.\n";
 
-    $backup  = $root . '/storage/framework-backup/' . date('Ymd-His') . '_' . ($current ?: 'sin-version');
+    // Proyectos de la 1.4.0 en adelante: apiService/storage. Los anteriores conservan su storage/ en la raíz.
+    $storage = is_dir($root . '/apiService/storage') || !is_dir($root . '/storage') ? $root . '/apiService/storage' : $root . '/storage';
+    $backup  = $storage . '/framework-backup/' . date('Ymd-His') . '_' . ($current ?: 'sin-version');
     $changes = []; $sql = []; $skipped = [];
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $path = $zip->getNameIndex($i);

@@ -5,11 +5,11 @@
  *   /materia/listar    → las materias con sus grupos
  *   /materia/guardar   → alta o cambio, con los grupos donde se imparte
  *   /materia/eliminar  → baja (si no tiene calificaciones)
- * La URL anterior /administrador/materias redirige a /materia/index (index.php raíz).
+ * La URL anterior /administrador/materias redirige a /materia/index (tabla Rutas).
  */
 class MateriaController extends Controller
 {
-    protected int $role = self::ADMIN;
+    public const MODULE = 'escolar';
 
     public function index(): void
     {
@@ -18,7 +18,7 @@ class MateriaController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Materias', 'Materia', 'List');
+        $this->api->command('Escolar', 'Materia', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -38,9 +38,9 @@ class MateriaController extends Controller
         $ids = array_values(array_unique(array_filter(array_map('intval', $Grupos), fn(int $id) => $id > 0)));
 
         if (!$materia->IdMateria) {
-            $this->api->command('Materias', 'Materia', 'Insert');
+            $this->api->command('Escolar', 'Materia', 'Insert');
         } else {
-            $this->api->command('Materias', 'Materia', 'Update');
+            $this->api->command('Escolar', 'Materia', 'Update');
             $this->api->addParameter('IdMateria', 'I', $materia->IdMateria);
         }
         $this->api->addParameter('Nombre', 'S', $materia->Nombre);
@@ -57,7 +57,7 @@ class MateriaController extends Controller
 
     public function eliminar(int $IdMateria): void
     {
-        $this->api->command('Materias', 'Materia', 'Delete');
+        $this->api->command('Escolar', 'Materia', 'Delete');
         $this->api->addParameter('IdMateria', 'I', $IdMateria);
         $result = $this->api->execute();
 

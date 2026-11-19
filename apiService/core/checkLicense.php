@@ -7,7 +7,7 @@
  */
 require_once __DIR__ . '/apiClient.php';
 
-define('LICENSE_CACHE_FILE', __DIR__ . '/../../storage/license_cache.json');
+define('LICENSE_CACHE_FILE', dirname(__DIR__) . '/storage/license_cache.json');
 define('LICENSE_TTL', 43200); // 12 horas
 
 function checkLicense(): void {
@@ -56,7 +56,7 @@ function showMaintenance(string $motivo): void {
 }
 
 function log_license_warning(string $msg): void {
-    $dir = __DIR__ . '/../../storage/logs';
+    $dir = dirname(__DIR__) . '/storage/logs';
     if (!is_dir($dir)) @mkdir($dir, 0755, true);
     @file_put_contents($dir . '/license.log', '[' . date('Y-m-d H:i:s') . '] WARNING: ' . $msg . PHP_EOL, FILE_APPEND);
 }

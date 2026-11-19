@@ -3,12 +3,11 @@
  * Panel del administrador: su pantalla de inicio.
  *   /dashboard/index    → pantalla del panel
  *   /dashboard/resumen  → sus números (totales, saldo, pagos y alumnos por grupo)
- * La URL anterior /administrador redirige a /dashboard/index (index.php raíz).
+ * La URL anterior /administrador redirige a /dashboard/index (tabla Rutas).
  */
 class DashboardController extends Controller
 {
-    protected int $role = self::ADMIN;
-    protected array $readActions = ['index', 'resumen'];
+    public const MODULE = 'escolar';
 
     public function index(): void
     {
@@ -17,12 +16,12 @@ class DashboardController extends Controller
 
     public function resumen(): void
     {
-        $this->api->command('Dashboard', 'Dashboard', 'Summary');
+        $this->api->command('Escolar', 'Dashboard', 'Summary');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $resumen = DashboardResumen::fromRow($result->row() ?? []);
 
-        $this->api->command('Dashboard', 'Dashboard', 'StudentsByGroup');
+        $this->api->command('Escolar', 'Dashboard', 'StudentsByGroup');
         $result = $this->api->execute();
 
         if (!$result->status()) {

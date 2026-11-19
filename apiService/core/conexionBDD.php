@@ -1,20 +1,24 @@
 <?php
 require_once __DIR__ . '/env.php';
 
-$conexion = mysqli_init();
-mysqli_options($conexion, MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
+/**
+ * La conexión a la base del colegio, abierta una sola vez por petición. La usan el router (para el controller y el
+ * catálogo de permisos) y Rutas. Si la base no responde lanza RuntimeException: el router la convierte en 500.
+ */
+function conexionPrincipal(): mysqli
+{
+    static $conexion = null;
+    if ($conexion !== null) return $conexion;
 
-if (!mysqli_real_connect(
-    $conexion,
-    $_ENV['DB_HOST'],
-    $_ENV['DB_USER'],
-    $_ENV['DB_PASSWORD'],
-    $_ENV['DB_NAME']
-)) {
-    error_log('DB error: ' . mysqli_connect_error());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Error de conexión.']);
-    exit;
+    $db = mysqli_init();
+    mysqli_options($db, MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);   // los procedures avisan con excepciones (procedure.php)
+    try {
+        mysqli_real_connect($db, $_ENV['DB_HOST'] ?? '', $_ENV['DB_USER'] ?? '', $_ENV['DB_PASSWORD'] ?? '', $_ENV['DB_NAME'] ?? '',
+                            isset($_ENV['DB_PORT']) ? (int) $_ENV['DB_PORT'] : null);
+    } catch (mysqli_sql_exception $e) {
+        throw new RuntimeException('DB error: ' . $e->getMessage());
+    }
+    mysqli_set_charset($db, 'utf8mb4');
+    return $conexion = $db;
 }
-
-mysqli_set_charset($conexion, 'utf8mb4');

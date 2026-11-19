@@ -32,6 +32,7 @@ CREATE PROCEDURE sp_persona_crear(IN pNombre VARCHAR(25), IN pPaterno VARCHAR(25
 SQL SECURITY INVOKER
 BEGIN
     DECLARE vIdUsuario INT;
+    DECLARE vIdCuenta INT;
     DECLARE EXIT HANDLER FOR SQLEXCEPTION
     BEGIN
         ROLLBACK;
@@ -51,10 +52,15 @@ BEGIN
     VALUES (pMatricula, vIdUsuario, pIdGrupo, pIdPermiso,
             (SELECT id_status FROM status WHERE ambito = 'alumno' AND clave = 'activo'),
             pNivelesIngles, pCorreoTutor, pCorreoTutor2);
+    SET vIdCuenta = LAST_INSERT_ID();
+
+    -- El perfil de su tipo (Perfiles.TipoCuenta), si hay uno. Un perfil administrador nunca se da solo.
+    INSERT IGNORE INTO CuentaPerfiles (IdCuenta, IdPerfil)
+    SELECT vIdCuenta, IdPerfil FROM Perfiles WHERE TipoCuenta = pIdPermiso AND Activo = 1 AND EsAdmin = 0;
 
     COMMIT;
 
-    SELECT LAST_INSERT_ID() AS Id;
+    SELECT vIdCuenta AS Id;
 END $$
 
 -- Cambia nombre, matrícula y, según el rol, el resto, todo o nada:

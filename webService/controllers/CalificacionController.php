@@ -6,14 +6,13 @@
  *   /calificacion/contexto  → grupos de la maestra y materias del grupo
  *   /calificacion/listar    → alumnos del grupo con sus notas de una materia
  *   /calificacion/guardar   → notas de un alumno en una materia
- * La URL anterior /maestro/calificaciones redirige a /calificacion/index (index.php raíz).
+ * La URL anterior /maestro/calificaciones redirige a /calificacion/index (tabla Rutas).
  */
 class CalificacionController extends Controller
 {
+    public const MODULE = 'escolar';
     use ContextoMaestro;
 
-    protected int $role = self::TEACHER;
-    protected array $readActions = ['index', 'contexto', 'listar'];
 
     public function index(): void
     {
@@ -37,7 +36,7 @@ class CalificacionController extends Controller
         $this->cargarContexto($IdGrupo);
         $this->ensure($IdMateria > 0, 'Materia no válida para tu grupo.');
 
-        $this->api->command('Calificaciones', 'Calificacion', 'List');
+        $this->api->command('Escolar', 'Calificacion', 'List');
         $this->api->addParameter('IdMateria',  'I', $IdMateria);
         $this->api->addParameter('IdCiclo',    'I', $this->ciclo->IdCiclo);
         $this->api->addParameter('IdGrupo',    'I', $this->grupo->IdGrupo);
@@ -61,7 +60,7 @@ class CalificacionController extends Controller
             $notas[$campo] = $this->nota($valor);
         }
 
-        $this->api->command('Calificaciones', 'Calificacion', 'Save');
+        $this->api->command('Escolar', 'Calificacion', 'Save');
         $this->api->addParameter('IdCuenta',   'I', $IdCuenta);
         $this->api->addParameter('IdMateria',  'I', $IdMateria);
         $this->api->addParameter('IdCiclo',    'I', $this->ciclo->IdCiclo);

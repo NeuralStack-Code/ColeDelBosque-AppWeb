@@ -1,9 +1,11 @@
 <?php
-/** Reporte semanal de la maestra. La pinta ReporteController::index(). Recibe $base y $nombre. Su JavaScript llama a /reporte/<método>. */
+/** Reporte semanal (maestras y administrador). La pinta ReporteController::index(). Recibe $base, $nombre, $panel y $rol. Su JavaScript llama a /reporte/<método>. */
 $title    = 'Reporte semanal | Colegio del Bosque';
 $extraCss = ['maestro.css'];
 $img      = $base . '/webService/wwwroot/img';
 $nombre   = $nombre ?: 'Maestro';
+$panel    = $panel ?? '/maestro';
+$rol      = $rol ?? 'Panel del maestro';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -14,9 +16,9 @@ $nombre   = $nombre ?: 'Maestro';
     <!-- Topbar -->
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/maestro" class="marca">
+            <a href="<?= $base . $panel ?>" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
-                <span>Colegio del Bosque<small>Panel del maestro</small></span>
+                <span>Colegio del Bosque<small><?= htmlspecialchars($rol) ?></small></span>
             </a>
             <div style="display:flex;align-items:center;gap:1.2em;">
                 <span class="user">Hola, <strong><?= htmlspecialchars($nombre) ?></strong></span>
@@ -28,7 +30,7 @@ $nombre   = $nombre ?: 'Maestro';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/maestro">
+    <a class="volver-panel" href="<?= $base . $panel ?>">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>

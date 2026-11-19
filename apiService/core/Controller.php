@@ -5,22 +5,24 @@
  * NO toca la base: le pide todo al business por el server api ($this->api, ver core/ServerApi.php),
  * revisa el status y carga en models la tabla que recibe.
  *
- *     class ClienteController extends Controller {
- *         public function eliminar(int $IdCliente): void {
- *             $this->api->command('Ventas', 'Cliente', 'Delete');          // módulo, entidad, operación
- *             $this->api->addParameter('IdCliente', 'I', $IdCliente);      // nombre, tipo, valor
+ *     class CicloController extends Controller {
+ *         public const MODULE = 'escolar';
+ *         public function eliminar(int $IdCiclo): void {
+ *             $this->api->command('Escolar', 'Ciclo', 'Delete');           // módulo, entidad, operación
+ *             $this->api->addParameter('IdCiclo', 'I', $IdCiclo);          // nombre, tipo, valor
  *             $result = $this->api->execute();
  *
  *             if (!$result->status()) {                                    // status() TRUE = hubo error
- *                 $this->ensure($result->affected() > 0, 'Cliente no encontrado.', 404);
- *                 $this->success('Cliente eliminado.');
+ *                 $this->ensure($result->affected() > 0, 'Ciclo no encontrado.', 404);
+ *                 $this->success('Ciclo eliminado.');
  *             } else {
  *                 $this->failure($result);
  *             }
  *         }
  *     }
  *
- * Lo que se repetiría en cada método vive aquí una sola vez (authorize): la sesión y el verbo HTTP.
+ * Permisos: NO se revisan aquí. El router le pregunta al catálogo (core/Catalog.php) antes de ejecutar cualquier
+ * método: si está registrado, si exige POST y si algún perfil de la cuenta lo concede. Ya no hay roles.
  * Los errores inesperados los atrapa el router (log + "Error interno"); nunca llegan al navegador.
  */
 abstract class Controller
@@ -28,19 +30,12 @@ abstract class Controller
     /** Base de datos que le da el router a este controller: 'principal' o 'ninguna'. */
     public const CONNECTION = 'principal';
 
-    /** Roles de las cuentas (tabla permisos). */
-    public const ADMIN = 1, TEACHER = 2, PARENT = 3, DEVELOPER = 4;
-
-    /** Pantalla de inicio de cada rol. */
-    private const HOME = [self::ADMIN => '/dashboard/index', self::TEACHER => '/maestro', self::PARENT => '/padre/index', self::DEVELOPER => '/desarrollador'];
-
-    /** Rol que pide TODO el controller (0 = basta la sesión). Lo que sea de otro rol lo revisa su método. */
-    protected int $role = 0;
-
-    /** Métodos que cualquiera puede llamar SIN sesión (una página pública, 'entrar'…). */
-    protected array $publicActions = [];
-    /** Métodos que solo LEEN (aceptan GET). Todo lo demás escribe y exige POST. */
-    protected array $readActions = ['index', 'listar'];
+    /**
+     * Su módulo (la sección del menú: escolar, pagos, padre, sistema; sitio para lo público). Es su paquete: sus
+     * business y models viven en webService/business/<módulo> y webService/models/<módulo>. Un controller pertenece
+     * a UN módulo; lo que comparten varios va en webService/libs. El módulo framework (el catálogo) siempre está activo.
+     */
+    public const MODULE = '';
 
     /** Por aquí se le habla al business. */
     protected ServerApi $api;
@@ -52,63 +47,42 @@ abstract class Controller
         $this->db     = $connection;
         $this->api    = new ServerApi($connection);
         $this->method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-        Command::actor($this->userId());                          // auditoría: quién actúa en esta petición (0 = sin sesión)
+        Command::actor($this->accountId());                       // auditoría: la CUENTA que actúa (los perfiles son de la cuenta; 0 = sin sesión)
     }
 
-    /* ── Guardias ── */
-
     /**
-     * Guardia ÚNICO de todos los métodos: el router lo llama antes de ejecutar cualquiera.
-     *   1. Sesión y el rol del controller ($role), salvo en los métodos de $publicActions.
-     *      index es la PANTALLA: sin sesión manda a entrar; con otro rol, a la pantalla de inicio de ese rol.
-     *   2. POST, salvo en los métodos de $readActions.
-     * Lo que pida algo más lo agrega su método o sobrescribe authorize().
+     * Guardia de un controller que el catálogo no decide. En el colegio todos están en el catálogo: el router nunca
+     * llega aquí. Se queda como red de seguridad (pide sesión).
      */
     public function authorize(string $action): void
     {
-        if (!in_array($action, $this->publicActions, true)) {
-            if ($action === 'index') $this->requireScreen($this->role);
-            else $this->requireRole($this->role);
-        }
-        if (!in_array($action, $this->readActions, true)) $this->requirePost();
+        $this->requireSession();
     }
 
-    /** Rol de quien está en sesión (0 si no hay). */
-    protected function roleId(): int
+    /* ── Sesión ── */
+
+    /** Nombre de quien está en sesión (lo guarda AuthController), o null. */
+    protected function user(): ?string
     {
-        return $this->user() === null ? 0 : (int) ($_SESSION['permiso'] ?? 0);
+        return $_SESSION['usuario'] ?? null;
     }
 
-    /** Id del usuario en sesión (0 si no hay). */
+    /** Id de la persona en sesión (tabla usuario; 0 si no hay). Es el actor de la auditoría. */
     protected function userId(): int
     {
         return $this->user() === null ? 0 : (int) ($_SESSION['id'] ?? 0);
     }
 
-    /** Pantalla de inicio que le toca a un rol (la del sitio si no tiene). */
-    protected static function homeOf(int $role): string
+    /** Id de la cuenta en sesión (tabla cuenta; 0 si no hay). Los perfiles se asignan a la cuenta. */
+    protected function accountId(): int
     {
-        return self::HOME[$role] ?? '/';
+        return Catalog::account();
     }
 
-    /** Guardia de un método: sesión y, si se indica, ese rol. Responde 401 / 403 en JSON. */
-    protected function requireRole(int $role = 0): void
+    /** Pantalla de inicio de quien está en sesión (la de su perfil principal). */
+    protected function home(): string
     {
-        $this->requireSession();
-        if ($role !== 0 && $this->roleId() !== $role) response(403, false, 'No tienes permiso para realizar esta acción.');
-    }
-
-    /** Guardia de una PANTALLA: sin sesión manda a entrar; con otro rol, a la pantalla de inicio de ese rol. */
-    protected function requireScreen(int $role = 0): void
-    {
-        if ($this->user() === null) $this->redirect('/auth/entrar');
-        if ($role !== 0 && $this->roleId() !== $role) $this->redirect(self::homeOf($this->roleId()));
-    }
-
-    /** Usuario en sesión (el que guardó tu login en $_SESSION['usuario']), o null. */
-    protected function user(): mixed
-    {
-        return $_SESSION['usuario'] ?? null;
+        return Catalog::home();
     }
 
     protected function requireSession(): void
@@ -121,9 +95,18 @@ abstract class Controller
         if ($this->method !== 'POST') response(405, false, 'Método no permitido.');
     }
 
-    protected function isAdmin(): bool
+    /* ── Catálogo de permisos (core/Catalog.php) ── */
+
+    /**
+     * ¿Algún perfil de la cuenta le concede este método de este controller? Para decidir qué ofrece la pantalla
+     * (botones, datos): la guardia del router ya decidió si puede entrar; esto es para lo que muestra adentro.
+     */
+    protected function granted(string $method): bool
     {
-        return $this->roleId() === self::ADMIN;
+        static $cache = [];
+        $component = Catalog::component($this);
+        $cache[$component] ??= $this->db !== null ? Catalog::granted($this->db, $component) : [];
+        return in_array($method, $cache[$component], true);
     }
 
     /** Corta con 422 (o el estatus que se indique) si la condición no se cumple. */
@@ -155,35 +138,19 @@ abstract class Controller
 
     /**
      * Pinta una vista (webService/views/<archivo>.php) con sus datos ya preparados.
-     * La vista solo imprime: recibe cada dato como variable y usa e() para escapar.
+     * La vista solo imprime: recibe cada dato como variable y usa e() para escapar. Con sesión, los accesos de los
+     * paneles salen del catálogo: la vista pregunta can('ciclo/index') y solo muestra lo que el perfil concede.
      */
     protected function view(string $file, array $data = []): void
     {
         header('Content-Type: text/html; charset=utf-8');
+        if ($this->db !== null && $this->accountId() !== 0) {
+            $GLOBALS['__cbMenu'] = array_column(Catalog::menu($this->db), 'Ruta');
+        }
         $base = BASE_URL;
         extract($data, EXTR_SKIP);
         require dirname(__DIR__, 2) . '/webService/views/' . $file . '.php';
     }
-}
-
-/**
- * Rutas por convención:  /<controller>/<método>   →   <Controller>Controller::<método>()
- *     /cliente/index      → ClienteController::index()       (la pantalla; /cliente a secas también llega aquí)
- *     /cliente/guardar    → ClienteController::guardar()
- * Regresa la clase del controller de ese primer tramo de la URL, o null si no hay. No hay mapa de rutas.
- */
-function routeController(string $segment): ?string
-{
-    static $classes = null;
-    if ($classes === null) {
-        $classes = [];
-        foreach (glob(dirname(__DIR__, 2) . '/webService/controllers/*Controller.php') as $file) {
-            $class = basename($file, '.php');
-            $classes[strtolower(substr($class, 0, -10))] = $class;      // 'cliente' => 'ClienteController'
-        }
-    }
-    $class = $classes[strtolower($segment)] ?? null;
-    return $class !== null && is_subclass_of($class, Controller::class) ? $class : null;
 }
 
 /**
@@ -268,4 +235,10 @@ function money(float|int|string|null $amount): string
 function truncate(string $text, int $length): string
 {
     return preg_match('/^.{' . $length . '}(?=.)/us', $text, $m) ? $m[0] . '…' : $text;
+}
+
+/** ¿El perfil de quien está en sesión puede abrir esa pantalla? can('ciclo/index'). Lo usan los paneles. */
+function can(string $route): bool
+{
+    return in_array('/' . trim($route, '/'), $GLOBALS['__cbMenu'] ?? [], true);
 }

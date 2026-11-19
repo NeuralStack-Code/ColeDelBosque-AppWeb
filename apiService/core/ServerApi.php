@@ -20,6 +20,18 @@
  *
  * Cada parámetro llena el campo del mismo nombre en la entidad; la operación es un método público
  * del business (List → list()). Un nombre mal escrito truena al instante (LogicException).
+ *
+ * Varios comandos que van juntos o no van (1.5.0, el XCTransactionProtocol de Ixaya): un solo commit al final; si uno
+ * falla, rollback de todos y transaction() regresa el Result que falló. Los que siguen ya no se ejecutan.
+ *
+ *     $result = $this->api->transaction(function (ServerApi $api) use ($pedido) {
+ *         $api->command('Ventas', 'Pedido', 'Insert');   …   $id = $api->execute()->id();
+ *         $api->command('Ventas', 'Partida', 'Insert');  $api->addParameter('IdPedido', 'I', $id);  …  $api->execute();
+ *     });
+ *     if ($result->status()) $this->failure($result);      // el que falló (y nada quedó guardado)
+ *
+ * Un procedure que abre su propia transacción confirmaría la de afuera (así funciona MySQL/MariaDB): Command no lo deja
+ * correr dentro de transaction(). La convención para los procedures que se usen aquí: ver framework/core-sql.
  */
 final class ServerApi
 {
@@ -29,6 +41,8 @@ final class ServerApi
     private string $operation = '';
     /** nombre => [tipo, valor] */
     private array $parameters = [];
+    /** El último Result de esta transacción (lo que regresa transaction() si todo salió bien). */
+    private ?Result $last = null;
 
     public function __construct(?mysqli $db) { $this->db = $db; }
 
@@ -73,7 +87,42 @@ final class ServerApi
         }
         $returned = $business->{$method}();
 
-        return new Result($business, is_array($returned) ? $returned : []);
+        $result = $this->last = new Result($business, is_array($returned) ? $returned : []);
+        if (Command::$inTransaction && $result->status()) throw new TransactionFailed($result);   // corta y deshace todo
+        return $result;
+    }
+
+    /**
+     * Corre $fn (recibe este ServerApi) en UNA transacción: commit si todos los comandos salen bien; si uno falla, rollback
+     * de todo y regresa ese Result (status() = true). Una excepción también deshace todo y sigue su camino.
+     * Dentro de otra transaction() se suma a la de afuera (un solo commit, el de la de afuera).
+     */
+    public function transaction(callable $fn): Result
+    {
+        if ($this->db === null) throw new LogicException('Una transacción necesita conexión a la base.');
+        if (Command::$inTransaction) {                                   // anidada: es parte de la de afuera
+            $fn($this);
+            return $this->last ?? throw new LogicException('La transacción no ejecutó ningún comando.');
+        }
+
+        $this->last = null;
+        $this->db->begin_transaction();
+        Command::$inTransaction = true;
+        try {
+            $fn($this);
+            if ($this->last === null) throw new LogicException('La transacción no ejecutó ningún comando.');
+            Command::$inTransaction = false;
+            $this->db->commit();
+            return $this->last;
+        } catch (TransactionFailed $failed) {
+            Command::$inTransaction = false;
+            $this->db->rollback();
+            return $failed->result;
+        } catch (Throwable $e) {
+            Command::$inTransaction = false;
+            try { $this->db->rollback(); } catch (Throwable $x) { /* la conexión ya no sirve: manda el error original */ }
+            throw $e;
+        }
     }
 
     /** Convierte el valor (casi siempre texto de un formulario) al tipo del parámetro. */
@@ -125,4 +174,13 @@ final class Result
     public function id(): int         { return (int) ($this->table[0]['Id'] ?? 0); }
     /** Filas que afectó una baja (columna Afectadas de la tabla). */
     public function affected(): int   { return (int) ($this->table[0]['Afectadas'] ?? 0); }
+}
+
+/** Interna: un comando falló dentro de ServerApi::transaction(). La atrapa transaction(), que hace rollback y regresa el Result. */
+final class TransactionFailed extends RuntimeException
+{
+    public function __construct(public readonly Result $result)
+    {
+        parent::__construct('Comando fallido dentro de la transacción: ' . $result->message());
+    }
 }

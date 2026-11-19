@@ -5,11 +5,11 @@
  *   /reportecolumna/listar    → todas las columnas, en su orden
  *   /reportecolumna/guardar   → alta o cambio
  *   /reportecolumna/eliminar  → baja (si aún no hay reportes con ella; si los hay, se desactiva)
- * La URL anterior /administrador/reporte-columnas redirige a /reportecolumna/index (index.php raíz).
+ * La URL anterior /administrador/reporte-columnas redirige a /reportecolumna/index (tabla Rutas).
  */
 class ReporteColumnaController extends Controller
 {
-    protected int $role = self::ADMIN;
+    public const MODULE = 'escolar';
 
     public function index(): void
     {
@@ -18,7 +18,7 @@ class ReporteColumnaController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Reportes', 'ReporteColumna', 'List');
+        $this->api->command('Escolar', 'ReporteColumna', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -38,9 +38,9 @@ class ReporteColumnaController extends Controller
         $this->ensure((bool) preg_match('/^.{0,60}$/us', $etiqueta), 'El texto del correo no puede pasar de 60 caracteres.');
 
         if (!$columna->IdColumna) {
-            $this->api->command('Reportes', 'ReporteColumna', 'Insert');
+            $this->api->command('Escolar', 'ReporteColumna', 'Insert');
         } else {
-            $this->api->command('Reportes', 'ReporteColumna', 'Update');
+            $this->api->command('Escolar', 'ReporteColumna', 'Update');
             $this->api->addParameter('IdColumna', 'I', $columna->IdColumna);
         }
         $this->api->addParameter('Nombre',   'S', $columna->Nombre);
@@ -60,7 +60,7 @@ class ReporteColumnaController extends Controller
 
     public function eliminar(int $IdColumna): void
     {
-        $this->api->command('Reportes', 'ReporteColumna', 'Delete');
+        $this->api->command('Escolar', 'ReporteColumna', 'Delete');
         $this->api->addParameter('IdColumna', 'I', $IdColumna);
         $result = $this->api->execute();
 

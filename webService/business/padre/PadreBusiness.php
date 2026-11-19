@@ -38,4 +38,19 @@ class PadreBusiness extends Entity
         $this->db->addParameter('CorreoTutor2', $this->CorreoTutor2);
         return $this->db->execute();
     }
+
+    /** El ciclo activo (tabla vacía si no hay ninguno). */
+    public function activeCycle(): array
+    {
+        $this->db->command('sp_ciclo_activo');
+        return $this->db->execute();
+    }
+
+    /** Las colegiaturas de la cuenta, con lo abonado (las mismas filas que ve el administrador). */
+    public function payments(): array
+    {
+        $this->db->command('sp_colegiatura_listar');
+        $this->db->addParameter('IdCuenta', $this->IdCuenta);
+        return $this->db->execute();
+    }
 }

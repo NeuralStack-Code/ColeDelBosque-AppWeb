@@ -1,21 +1,31 @@
-# Secretos y config local
+# Credenciales — NUNCA subir
 .env
+*.env
 .env.*
 !.env.example
+
+# Lo que escribe el sistema (licencia, logs, caché de firmas, copias del actualizador)
+/apiService/storage/logs/
+/apiService/storage/cache/
+/apiService/storage/license_cache.json
+/apiService/storage/license_cache.json.*
+/apiService/storage/framework-backup/
+*.log
+
+# Fuentes SQL: NO van al servidor (viven en la rama DeployBacklog y en SqlNSC/ColegioDelBosque)
+/webService/sql/
+
+# Ubicación anterior de storage: que no se suba por error
+/storage/
+
+# Respaldos y volcados sueltos
+/*.sql
+*.bak
+*.zip
+*.dump
 
 # Editor / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
-
-# Logs y temporales
-*.log
-_pendientes.sql
-_prev_*.html
-_dev*.php
-/*.sql
-/storage/*.log
-
-# Copias que deja el actualizador del framework (php apiService/core/update.php)
-/storage/framework-backup/

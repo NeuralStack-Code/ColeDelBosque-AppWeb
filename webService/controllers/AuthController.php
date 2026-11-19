@@ -1,48 +1,51 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt(): la matrícula se guarda encriptada
 
 /**
  * Acceso a la plataforma. Se entra con la matrícula (no hay contraseña).
  *   /auth/entrar  → pantalla de inicio de sesión · POST inicia sesión
  *   /auth/salir   → cierra la sesión
- * La URL anterior /inicio-sesion redirige a /auth/entrar (index.php raíz).
+ * La URL anterior /inicio-sesion redirige a /auth/entrar (tabla Rutas).
  */
 class AuthController extends Controller
 {
-    /** Aquí todavía no hay sesión que exigir: la pantalla acepta GET y todo lo demás es POST. */
-    public function authorize(string $action): void
-    {
-        if ($action === 'entrar' && $this->method === 'GET') return;
-        $this->requirePost();
-    }
-
+    public const MODULE = 'sitio';
+    /** GET: la pantalla de entrar (si ya entró, a su panel) · POST: inicia sesión con la matrícula. Pública. */
     public function entrar(string $Matricula = ''): void
     {
         if ($this->method === 'GET') {
-            if ($this->user() !== null) $this->redirect(self::homeOf($this->roleId()));   // ya entró: a su panel
+            if ($this->user() !== null) $this->redirect($this->home());   // ya entró: a su panel
             $this->view('site/inicio_sesion');
             return;
         }
 
         $this->ensure($Matricula !== '', 'Ingresa tu matrícula.');
 
-        $this->api->command('Auth', 'Auth', 'Authenticate');
-        $this->api->addParameter('Matricula', 'S', encrypt($Matricula));   // se encripta y se compara: la base nunca la tiene en claro
+        $this->api->command('Sitio', 'Auth', 'Authenticate');
+        $this->api->addParameter('Matricula', 'S', Cifrado::encrypt($Matricula));   // se encripta y se compara: la base nunca la tiene en claro
         $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $this->ensure($result->row() !== null, 'ID incorrecto. Verifica tu matrícula.', 401);
+        $sesion = Sesion::fromRow($result->row());
 
-        if (!$result->status()) {
-            $this->ensure($result->row() !== null, 'ID incorrecto. Verifica tu matrícula.', 401);
-            $sesion = Sesion::fromRow($result->row());
-
-            session_regenerate_id(true);
-            $_SESSION['usuario'] = $sesion->displayName();
-            $_SESSION['permiso'] = $sesion->IdPermiso;
-            $_SESSION['id']      = $sesion->IdUsuario;
-
-            $this->success('Bienvenido, ' . $sesion->displayName() . '.', ['redirect' => self::homeOf($sesion->IdPermiso)]);
-        } else {
-            $this->failure($result);
+        // Sus perfiles (catálogo de permisos): el primero en importancia da su pantalla de inicio y el nombre del panel.
+        $this->api->command('Framework', 'PerfilAcceso', 'AccountProfiles');
+        $this->api->addParameter('IdCuenta', 'I', (int) $sesion->IdCuenta);
+        $result = $this->api->execute();
+        if ($result->status()) $this->failure($result);
+        $principal = null;
+        foreach ($result->table() as $perfil) {
+            if ((int) $perfil['Activo'] === 1) { $principal = $perfil; break; }
         }
+
+        session_regenerate_id(true);
+        $_SESSION = [];
+        $_SESSION['usuario']   = $sesion->displayName();
+        $_SESSION['id']        = $sesion->IdUsuario;            // la persona (auditoría, sus grupos, sus recibos)
+        $_SESSION['id_cuenta'] = $sesion->IdCuenta;             // la cuenta (sus perfiles)
+        $_SESSION['perfil']    = (string) ($principal['Nombre'] ?? '');
+        $_SESSION['inicio']    = (string) ($principal['Inicio'] ?? '');
+
+        $this->success('Bienvenido, ' . $sesion->displayName() . '.', ['redirect' => $this->home()]);
     }
 
     public function salir(): void

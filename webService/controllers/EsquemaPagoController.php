@@ -1,5 +1,4 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // decrypt(): la matrícula se guarda encriptada
 
 /**
  * Esquemas de pago por ciclo escolar (solo el administrador): cuánto y cuántos meses se cobra, y a quiénes.
@@ -10,12 +9,11 @@ require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // decrypt()
  *   /esquemapago/guardar    → alta o cambio
  *   /esquemapago/eliminar   → baja (los pagos ya generados se conservan)
  *   /esquemapago/aplicar    → genera inscripción y mensualidades a todo el ciclo, a un grupo o a un alumno
- * La URL anterior /administrador/esquemas-pago redirige a /esquemapago/index (index.php raíz).
+ * La URL anterior /administrador/esquemas-pago redirige a /esquemapago/index (tabla Rutas).
  */
 class EsquemaPagoController extends Controller
 {
-    protected int $role = self::ADMIN;
-    protected array $readActions = ['index', 'listar', 'catalogos', 'desglose'];
+    public const MODULE = 'pagos';
 
     public function index(): void
     {
@@ -24,22 +22,22 @@ class EsquemaPagoController extends Controller
 
     public function catalogos(): void
     {
-        $this->api->command('Ciclos', 'Ciclo', 'List');
+        $this->api->command('Pagos', 'EsquemaPago', 'Cycles');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $ciclos = Ciclo::fromTable($result->table());
 
-        $this->api->command('Esquemas_pago', 'EsquemaPago', 'Groups');
+        $this->api->command('Pagos', 'EsquemaPago', 'Groups');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $grupos = GrupoOpcion::fromTable($result->table());
 
-        $this->api->command('Esquemas_pago', 'EsquemaPago', 'Students');
+        $this->api->command('Pagos', 'EsquemaPago', 'Students');
         $result = $this->api->execute();
 
         if (!$result->status()) {
             $alumnos = AlumnoOpcion::fromTable($result->table());
-            foreach ($alumnos as $alumno) $alumno->Matricula = (string) decrypt($alumno->Matricula);
+            foreach ($alumnos as $alumno) $alumno->Matricula = (string) Cifrado::decrypt($alumno->Matricula);
             $this->success('Catálogos.', ['ciclos' => $ciclos, 'grupos' => $grupos, 'alumnos' => $alumnos]);
         } else {
             $this->failure($result);
@@ -48,7 +46,7 @@ class EsquemaPagoController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Esquemas_pago', 'EsquemaPago', 'List');
+        $this->api->command('Pagos', 'EsquemaPago', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -96,9 +94,9 @@ class EsquemaPagoController extends Controller
         $this->ensure($esquema->NumMeses <= $disponibles, "Desde ese mes el ciclo solo tiene $disponibles mensualidad(es).");
 
         if (!$esquema->IdEsquema) {
-            $this->api->command('Esquemas_pago', 'EsquemaPago', 'Insert');
+            $this->api->command('Pagos', 'EsquemaPago', 'Insert');
         } else {
-            $this->api->command('Esquemas_pago', 'EsquemaPago', 'Update');
+            $this->api->command('Pagos', 'EsquemaPago', 'Update');
             $this->api->addParameter('IdEsquema', 'I', $esquema->IdEsquema);
         }
         $this->api->addParameter('IdCiclo',          'I', $esquema->IdCiclo);
@@ -121,7 +119,7 @@ class EsquemaPagoController extends Controller
 
     public function eliminar(int $IdEsquema): void
     {
-        $this->api->command('Esquemas_pago', 'EsquemaPago', 'Delete');
+        $this->api->command('Pagos', 'EsquemaPago', 'Delete');
         $this->api->addParameter('IdEsquema', 'I', $IdEsquema);
         $result = $this->api->execute();
 
@@ -144,7 +142,7 @@ class EsquemaPagoController extends Controller
         if ($AplicarA === 'grupo')  $this->ensure($IdGrupo > 0, 'Selecciona un grupo del ciclo del esquema.');
         if ($AplicarA === 'alumno') $this->ensure($IdCuenta > 0, 'Selecciona un alumno.');
 
-        $this->api->command('Esquemas_pago', 'EsquemaPago', 'Recipients');
+        $this->api->command('Pagos', 'EsquemaPago', 'Recipients');
         $this->api->addParameter('IdCiclo',  'I', $esquema->IdCiclo);
         $this->api->addParameter('AplicarA', 'S', in_array($AplicarA, ['grupo', 'alumno'], true) ? $AplicarA : 'todos');
         $this->api->addParameter('IdGrupo',  'I', $IdGrupo);
@@ -158,7 +156,7 @@ class EsquemaPagoController extends Controller
         $calendario = CalendarioPagos::de($esquema);
         foreach ($alumnos as $idCuenta) {
             foreach ($calendario as $pago) {
-                $this->api->command('Colegiaturas', 'Colegiatura', 'Generate');
+                $this->api->command('Pagos', 'Colegiatura', 'Generate');
                 $this->api->addParameter('IdCuenta',         'I', $idCuenta);
                 $this->api->addParameter('IdCiclo',          'I', $esquema->IdCiclo);
                 $this->api->addParameter('Tipo',             'S', $pago['Tipo']);
@@ -182,7 +180,7 @@ class EsquemaPagoController extends Controller
     /** El esquema; corta con 404 si no existe. */
     private function esquema(int $IdEsquema): EsquemaPago
     {
-        $this->api->command('Esquemas_pago', 'EsquemaPago', 'Get');
+        $this->api->command('Pagos', 'EsquemaPago', 'Get');
         $this->api->addParameter('IdEsquema', 'I', $IdEsquema);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
@@ -193,7 +191,7 @@ class EsquemaPagoController extends Controller
     /** El ciclo con sus fechas, o null si no existe. */
     private function ciclo(int $IdCiclo): ?Ciclo
     {
-        $this->api->command('Ciclos', 'Ciclo', 'Get');
+        $this->api->command('Pagos', 'EsquemaPago', 'Cycle');
         $this->api->addParameter('IdCiclo', 'I', $IdCiclo);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);

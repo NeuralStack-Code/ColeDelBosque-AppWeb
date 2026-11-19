@@ -1,33 +1,48 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // decrypt(): los correos de los tutores van encriptados
 require_once dirname(__DIR__, 2) . '/apiService/core/mail.php';     // enviarCorreo() → api central
 
 /**
- * Reporte semanal a papás (solo maestros), acotado a sus grupos: el propio (todas las materias) y los de sus niveles
- * de inglés (solo Inglés). Cada método recibe el grupo en que se trabaja (IdGrupo).
+ * Reporte semanal a papás, acotado a los grupos de la maestra: el propio (todas las materias) y los de sus niveles
+ * de inglés (solo Inglés). Quien tiene concedido /reporte/grupos (el perfil Administrador) trabaja con todos los
+ * grupos del ciclo. Cada método recibe el grupo en que se trabaja (IdGrupo).
  *   /reporte/index         → pantalla
  *   /reporte/contexto      → grupos de la maestra, materias del grupo y columnas activas del reporte
+ *   /reporte/grupos        → todos los grupos del ciclo activo (se concede aparte: marcar la pantalla no lo da)
  *   /reporte/semana        → la semana (lunes a viernes) con sus clases y el estado de envío por alumno
  *   /reporte/clase         → tema e incidencias de una clase (materia + día)
  *   /reporte/guardarClase  → guarda la clase y reemplaza sus incidencias
  *   /reporte/eliminarClase → borra una clase con sus incidencias
  *   /reporte/vistaPrevia   → el correo tal como lo recibirá el papá
  *   /reporte/enviar        → manda el reporte de UN alumno (la pantalla los manda uno por uno)
- * La URL anterior /maestro/reportes redirige a /reporte/index (index.php raíz).
+ * La URL anterior /maestro/reportes redirige a /reporte/index (tabla Rutas).
  */
 class ReporteController extends Controller
 {
+    public const MODULE = 'escolar';
     use ContextoMaestro;
 
     /** Hora del colegio, sin depender de la zona horaria del servidor ni de la base. */
     private const ZONA = 'America/Mexico_City';
 
-    protected int $role = self::TEACHER;
-    protected array $readActions = ['index', 'contexto', 'semana', 'clase', 'vistaPrevia'];
 
     public function index(): void
     {
-        $this->view('maestro/reportes', ['nombre' => $this->user()]);
+        $this->view('maestro/reportes', [
+            'nombre' => $this->user(),
+            'panel'  => $this->home(),
+            'rol'    => 'Panel del ' . strtolower(($_SESSION['perfil'] ?? '') ?: 'maestro'),
+        ]);
+    }
+
+    /**
+     * Todos los grupos del ciclo activo. Además de ser un endpoint, es el permiso de trabajar con cualquier grupo:
+     * quien lo tiene concedido (perfil Administrador) ve en la pantalla todos los grupos y no solo los suyos.
+     */
+    public function grupos(): void
+    {
+        $this->todosLosGrupos = true;
+        $this->cargarContexto(0);
+        $this->success('Grupos del ciclo.', ['grupos' => $this->grupos, 'ciclo' => $this->ciclo->Nombre]);
     }
 
     public function contexto(int $IdGrupo = 0): void
@@ -52,7 +67,7 @@ class ReporteController extends Controller
         $dias = [];
         for ($i = 0; $i < 5; $i++) $dias[] = date('Y-m-d', strtotime("$lunes +$i days"));
 
-        $this->api->command('Reportes', 'Reporte', 'Sends');
+        $this->api->command('Escolar', 'Reporte', 'Sends');
         $this->api->addParameter('IdGrupo', 'I', $this->grupo->IdGrupo);
         $this->api->addParameter('Semana',  'D', $lunes);
         $result = $this->api->execute();
@@ -62,7 +77,7 @@ class ReporteController extends Controller
         $alumnos = $this->alumnos();
         foreach ($alumnos as $alumno) $alumno->EnviadoEn = $envios[$alumno->IdCuenta] ?? null;
 
-        $this->api->command('Reportes', 'Reporte', 'Classes');
+        $this->api->command('Escolar', 'Reporte', 'Classes');
         $this->api->addParameter('IdGrupo', 'I', $this->grupo->IdGrupo);
         $this->api->addParameter('Desde',   'D', $lunes);
         $this->api->addParameter('Hasta',   'D', $viernes);
@@ -81,7 +96,7 @@ class ReporteController extends Controller
         $this->cargarContexto($IdGrupo);
         $this->materiaValida($IdMateria);
 
-        $this->api->command('Reportes', 'Reporte', 'Lesson');
+        $this->api->command('Escolar', 'Reporte', 'Lesson');
         $this->api->addParameter('IdGrupo',   'I', $this->grupo->IdGrupo);
         $this->api->addParameter('IdMateria', 'I', $IdMateria);
         $this->api->addParameter('Fecha',     'D', $this->fecha($Fecha)->format('Y-m-d'));
@@ -90,7 +105,7 @@ class ReporteController extends Controller
         $clase = $result->row() ? ClaseReporte::fromRow($result->row()) : null;
         if ($clase === null) $this->success('Clase obtenida.', ['IdClase' => null, 'tema' => '', 'marcas' => []]);
 
-        $this->api->command('Reportes', 'Reporte', 'Marks');
+        $this->api->command('Escolar', 'Reporte', 'Marks');
         $this->api->addParameter('IdClase', 'I', $clase->IdClase);
         $result = $this->api->execute();
 
@@ -134,7 +149,7 @@ class ReporteController extends Controller
             }
         }
 
-        $this->api->command('Reportes', 'Reporte', 'SaveLesson');
+        $this->api->command('Escolar', 'Reporte', 'SaveLesson');
         $this->api->addParameter('IdGrupo',   'I', $this->grupo->IdGrupo);
         $this->api->addParameter('IdMateria', 'I', $IdMateria);
         $this->api->addParameter('IdCiclo',   'I', $this->ciclo->IdCiclo);
@@ -155,14 +170,14 @@ class ReporteController extends Controller
     {
         $this->cargarContexto($IdGrupo);
 
-        $this->api->command('Reportes', 'Reporte', 'GetLesson');
+        $this->api->command('Escolar', 'Reporte', 'GetLesson');
         $this->api->addParameter('IdClase', 'I', $IdClase);
         $this->api->addParameter('IdGrupo', 'I', $this->grupo->IdGrupo);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $this->materiaValida((int) ($result->row()['IdMateria'] ?? 0));
 
-        $this->api->command('Reportes', 'Reporte', 'DeleteLesson');
+        $this->api->command('Escolar', 'Reporte', 'DeleteLesson');
         $this->api->addParameter('IdClase', 'I', $IdClase);
         $this->api->addParameter('IdGrupo', 'I', $this->grupo->IdGrupo);
         $result = $this->api->execute();
@@ -206,7 +221,7 @@ class ReporteController extends Controller
         }
 
         $enviadoEn = (new DateTime('now', new DateTimeZone(self::ZONA)))->format('Y-m-d H:i:s');
-        $this->api->command('Reportes', 'Reporte', 'RegisterSend');
+        $this->api->command('Escolar', 'Reporte', 'RegisterSend');
         $this->api->addParameter('IdCuenta',      'I', $IdCuenta);
         $this->api->addParameter('Semana',        'D', $lunes);
         $this->api->addParameter('EnviadoEn',     'S', $enviadoEn);
@@ -248,7 +263,7 @@ class ReporteController extends Controller
     /** @return ReporteColumna[] las columnas activas, en orden */
     private function columnas(): array
     {
-        $this->api->command('Reportes', 'ReporteColumna', 'List');
+        $this->api->command('Escolar', 'ReporteColumna', 'List');
         $this->api->addParameter('SoloActivas', 'B', true);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
@@ -258,7 +273,7 @@ class ReporteController extends Controller
     /** @return AlumnoReporte[] los alumnos del grupo de trabajo */
     private function alumnos(): array
     {
-        $this->api->command('Reportes', 'Reporte', 'Students');
+        $this->api->command('Escolar', 'Reporte', 'Students');
         $this->api->addParameter('IdGrupo', 'I', $this->grupo->IdGrupo);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
@@ -268,7 +283,7 @@ class ReporteController extends Controller
     /** El alumno con los correos de sus tutores ya descifrados; corta con 403 si no es del grupo. */
     private function alumno(int $IdCuenta): CorreoAlumno
     {
-        $this->api->command('Reportes', 'Reporte', 'Student');
+        $this->api->command('Escolar', 'Reporte', 'Student');
         $this->api->addParameter('IdCuenta', 'I', $IdCuenta);
         $this->api->addParameter('IdGrupo',  'I', $this->grupo->IdGrupo);
         $result = $this->api->execute();
@@ -276,8 +291,8 @@ class ReporteController extends Controller
         $this->ensure($result->row() !== null, 'Ese alumno no pertenece a tu grupo.', 403);
 
         $alumno = CorreoAlumno::fromRow($result->row());
-        $alumno->CorreoTutor  = $alumno->CorreoTutor  === null ? null : (string) decrypt($alumno->CorreoTutor);
-        $alumno->CorreoTutor2 = $alumno->CorreoTutor2 === null ? null : (string) decrypt($alumno->CorreoTutor2);
+        $alumno->CorreoTutor  = $alumno->CorreoTutor  === null ? null : (string) Cifrado::decrypt($alumno->CorreoTutor);
+        $alumno->CorreoTutor2 = $alumno->CorreoTutor2 === null ? null : (string) Cifrado::decrypt($alumno->CorreoTutor2);
         return $alumno;
     }
 
@@ -285,7 +300,7 @@ class ReporteController extends Controller
     private function correo(CorreoAlumno $alumno, DateTime $fecha): array
     {
         [$lunes, $viernes] = $this->semanaDe($fecha);
-        $this->api->command('Reportes', 'Reporte', 'StudentWeek');
+        $this->api->command('Escolar', 'Reporte', 'StudentWeek');
         $this->api->addParameter('IdCuenta', 'I', $alumno->IdCuenta);
         $this->api->addParameter('IdGrupo',  'I', $this->grupo->IdGrupo);
         $this->api->addParameter('Desde',    'D', $lunes);

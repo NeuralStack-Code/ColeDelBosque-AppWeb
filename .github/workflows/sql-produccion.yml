@@ -1,0 +1,57 @@
+# SQL a producción al subir a master. El código lo publica Hostinger solo (Git vinculado en hPanel); esta Action aplica
+# en la base del colegio las entregas de DeployBacklog que ya están listas y las mueve a desplegado/.
+#
+# Los scripts y el SQL viven en la rama DeployBacklog (el SQL nunca entra a master): aquí solo está este YAML.
+# Guía completa: automatizacion/README.md en DeployBacklog.
+#
+# También se puede correr a mano (Actions → "SQL a producción" → Run workflow):
+#   aplicar   lo mismo que un push a master
+#   revisar   entra al servidor y muestra cliente, conexión y permisos de la base del colegio (no cambia nada)
+#   listas    qué entregas de pendiente/ están listas y cuáles esperan una rama (no entra al servidor)
+name: SQL a producción
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      accion:
+        description: Qué hacer
+        type: choice
+        options: [aplicar, revisar, listas]
+        default: aplicar
+
+concurrency:
+  group: sql-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # mover las entregas a desplegado/ en DeployBacklog
+
+jobs:
+  sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: DeployBacklog
+
+      - name: SQL de DeployBacklog
+        env:
+          ACCION: ${{ inputs.accion || 'aplicar' }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          RUTA_SITIO: ${{ vars.RUTA_SITIO }}
+          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN || github.token }}
+          DISPARO: ${{ github.event_name }} a master (${{ github.sha }}) por ${{ github.actor }}
+        run: |
+          if [ "$ACCION" = listas ]; then bash automatizacion/desplegar.sh listas; exit; fi
+          if [ -z "$SSH_HOST" ]; then
+            echo "::warning::Faltan los secretos SSH_* del repo: no se aplicó nada. Ver automatizacion/README.md en DeployBacklog."
+            exit 0
+          fi
+          if [ "$ACCION" = revisar ]; then bash automatizacion/desplegar.sh revisar; else bash automatizacion/desplegar.sh produccion; fi

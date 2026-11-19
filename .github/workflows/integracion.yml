@@ -1,0 +1,53 @@
+# Integración con base de datos: arma la base en MariaDB 11.8 (la versión de producción) con la estructura de
+# producción y TODO el SQL de la rama DeployBacklog, y revisa que el catálogo de permisos del código sea el del SQL.
+# Guía: .github/scripts/integracion.sh. Mientras DeployBacklog no tenga esquema/produccion/colegio.sql, solo avisa.
+name: Integración
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integracion-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  base:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: ci_root_pw
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: SQL de la rama DeployBacklog
+        uses: actions/checkout@v7
+        with:
+          ref: DeployBacklog
+          path: .deploybacklog
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mysqli, mbstring
+          coverage: none
+
+      - name: Base, entregas, catálogo y router
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: '3306'
+          DB_USER: root
+          DB_PASSWORD: ci_root_pw
+        run: bash .github/scripts/integracion.sh .deploybacklog

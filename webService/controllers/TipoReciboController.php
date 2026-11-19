@@ -5,11 +5,11 @@
  *   /tiporecibo/listar    → los tipos
  *   /tiporecibo/guardar   → alta o cambio
  *   /tiporecibo/eliminar  → baja (si no hay recibos de ese tipo)
- * La URL anterior /administrador/tipos-recibo redirige a /tiporecibo/index (index.php raíz).
+ * La URL anterior /administrador/tipos-recibo redirige a /tiporecibo/index (tabla Rutas).
  */
 class TipoReciboController extends Controller
 {
-    protected int $role = self::ADMIN;
+    public const MODULE = 'pagos';
 
     public function index(): void
     {
@@ -18,7 +18,7 @@ class TipoReciboController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Tipos_recibo', 'TipoRecibo', 'List');
+        $this->api->command('Pagos', 'TipoRecibo', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -36,9 +36,9 @@ class TipoReciboController extends Controller
         $this->ensure(in_array($tipo->Naturaleza, TipoRecibo::NATURES, true), 'La naturaleza debe ser ingreso o gasto.');
 
         if (!$tipo->IdTipo) {
-            $this->api->command('Tipos_recibo', 'TipoRecibo', 'Insert');
+            $this->api->command('Pagos', 'TipoRecibo', 'Insert');
         } else {
-            $this->api->command('Tipos_recibo', 'TipoRecibo', 'Update');
+            $this->api->command('Pagos', 'TipoRecibo', 'Update');
             $this->api->addParameter('IdTipo', 'I', $tipo->IdTipo);
         }
         $this->api->addParameter('Nombre',     'S', $tipo->Nombre);
@@ -55,7 +55,7 @@ class TipoReciboController extends Controller
 
     public function eliminar(int $IdTipo): void
     {
-        $this->api->command('Tipos_recibo', 'TipoRecibo', 'Delete');
+        $this->api->command('Pagos', 'TipoRecibo', 'Delete');
         $this->api->addParameter('IdTipo', 'I', $IdTipo);
         $result = $this->api->execute();
 

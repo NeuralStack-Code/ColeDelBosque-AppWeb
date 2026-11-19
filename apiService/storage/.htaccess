@@ -1,0 +1,11 @@
+# apiService/storage/ es privado (caché de licencia, fotos de perfil): nunca se sirve directo por HTTP.
+# Apache 2.4 / LiteSpeed
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+# Apache 2.2 / compatibilidad
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+Options -Indexes

@@ -6,11 +6,11 @@
  *   /ciclo/guardar   → alta (nace cerrado) o cambio
  *   /ciclo/activar   → activa uno y cierra los demás
  *   /ciclo/eliminar  → baja
- * La URL anterior /administrador/ciclos redirige a /ciclo/index (index.php raíz).
+ * La URL anterior /administrador/ciclos redirige a /ciclo/index (tabla Rutas).
  */
 class CicloController extends Controller
 {
-    protected int $role = self::ADMIN;
+    public const MODULE = 'escolar';
 
     public function index(): void
     {
@@ -19,7 +19,7 @@ class CicloController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Ciclos', 'Ciclo', 'List');
+        $this->api->command('Escolar', 'Ciclo', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -38,9 +38,9 @@ class CicloController extends Controller
         $this->ensure($ciclo->FechaFin >= $ciclo->FechaInicio, 'La fecha fin no puede ser anterior a la de inicio.');
 
         if (!$ciclo->IdCiclo) {
-            $this->api->command('Ciclos', 'Ciclo', 'Insert');
+            $this->api->command('Escolar', 'Ciclo', 'Insert');
         } else {
-            $this->api->command('Ciclos', 'Ciclo', 'Update');
+            $this->api->command('Escolar', 'Ciclo', 'Update');
             $this->api->addParameter('IdCiclo', 'I', $ciclo->IdCiclo);
         }
         $this->api->addParameter('Nombre',      'S', $ciclo->Nombre);
@@ -58,7 +58,7 @@ class CicloController extends Controller
 
     public function activar(int $IdCiclo): void
     {
-        $this->api->command('Ciclos', 'Ciclo', 'Activate');
+        $this->api->command('Escolar', 'Ciclo', 'Activate');
         $this->api->addParameter('IdCiclo', 'I', $IdCiclo);
         $result = $this->api->execute();
 
@@ -71,7 +71,7 @@ class CicloController extends Controller
 
     public function eliminar(int $IdCiclo): void
     {
-        $this->api->command('Ciclos', 'Ciclo', 'Delete');
+        $this->api->command('Escolar', 'Ciclo', 'Delete');
         $this->api->addParameter('IdCiclo', 'I', $IdCiclo);
         $result = $this->api->execute();
 

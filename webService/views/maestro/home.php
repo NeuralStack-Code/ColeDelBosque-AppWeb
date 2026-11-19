@@ -1,12 +1,9 @@
 <?php
-$rol = 2; // solo maestros
-require __DIR__ . '/../partials/guard.php';
-
-$base     = BASE_URL;
+// La pinta MaestroController::index() (/maestro). Recibe $nombre y $base. Cada acceso se ve si el perfil de la
+// cuenta lo concede (can(), catálogo de permisos).
 $title    = 'Panel del maestro | Colegio del Bosque';
 $extraCss = ['maestro.css'];
 $img      = $base . '/webService/wwwroot/img';
-$nombre   = $_SESSION['usuario'] ?? 'Maestro';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -40,16 +37,20 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
 
     <!-- Tiles -->
     <section class="panel-tiles">
+        <?php if (can('calificacion/index')): ?>
         <a class="tile" href="<?= $base ?>/calificacion/index">
             <span class="tile-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg></span>
             <h3>Reportes y calificaciones</h3>
             <p>Registra calificaciones y reportes de tus alumnos.</p>
         </a>
+        <?php endif; ?>
+        <?php if (can('reporte/index')): ?>
         <a class="tile" href="<?= $base ?>/reporte/index">
             <span class="tile-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
             <h3>Reporte semanal</h3>
             <p>Captura cada clase y envía el reporte a los papás.</p>
         </a>
+        <?php endif; ?>
     </section>
 
     <script>

@@ -1,17 +1,15 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt() / decrypt(): los correos de los tutores van encriptados
 
 /**
  * Portal del alumno y su familia (solo el rol padre/alumno): solo lectura, salvo los correos de sus tutores.
  *   /padre/index           → pantalla
  *   /padre/resumen         → su grupo, calificaciones del ciclo activo, pagos y correos de tutor
  *   /padre/guardarCorreos  → a qué correos llega el reporte semanal
- * La URL anterior /padre redirige a /padre/index (index.php raíz).
+ * La URL anterior /padre redirige a /padre/index (tabla Rutas).
  */
 class PadreController extends Controller
 {
-    protected int $role = self::PARENT;
-    protected array $readActions = ['index', 'resumen'];
+    public const MODULE = 'padre';
 
     public function index(): void
     {
@@ -22,7 +20,7 @@ class PadreController extends Controller
     {
         $cuenta = $this->cuenta();
 
-        $this->api->command('Ciclos', 'Ciclo', 'Active');
+        $this->api->command('Padre', 'Padre', 'ActiveCycle');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $idCiclo = (int) ($result->row()['IdCiclo'] ?? 0);
@@ -35,7 +33,7 @@ class PadreController extends Controller
         if ($result->status()) $this->failure($result);
         $calificaciones = CalificacionMateria::fromTable($result->table());
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'List');
+        $this->api->command('Padre', 'Padre', 'Payments');
         $this->api->addParameter('IdCuenta', 'I', $cuenta->IdCuenta);
         $result = $this->api->execute();
 
@@ -46,8 +44,8 @@ class PadreController extends Controller
                 'grado'          => (string) $cuenta->Grado,
                 'calificaciones' => $calificaciones,
                 'pagos'          => $pagos,
-                'correoTutor'    => $cuenta->CorreoTutor  === null ? '' : (string) decrypt($cuenta->CorreoTutor),
-                'correoTutor2'   => $cuenta->CorreoTutor2 === null ? '' : (string) decrypt($cuenta->CorreoTutor2),
+                'correoTutor'    => $cuenta->CorreoTutor  === null ? '' : (string) Cifrado::decrypt($cuenta->CorreoTutor),
+                'correoTutor2'   => $cuenta->CorreoTutor2 === null ? '' : (string) Cifrado::decrypt($cuenta->CorreoTutor2),
             ]);
         } else {
             $this->failure($result);
@@ -62,8 +60,8 @@ class PadreController extends Controller
 
         $this->api->command('Padre', 'Padre', 'SaveEmails');
         $this->api->addParameter('IdUsuario',    'I', $this->userId());
-        $this->api->addParameter('CorreoTutor',  'S', $correo1 === '' ? null : encrypt($correo1));
-        $this->api->addParameter('CorreoTutor2', 'S', $correo2 === '' ? null : encrypt($correo2));
+        $this->api->addParameter('CorreoTutor',  'S', $correo1 === '' ? null : Cifrado::encrypt($correo1));
+        $this->api->addParameter('CorreoTutor2', 'S', $correo2 === '' ? null : Cifrado::encrypt($correo2));
         $result = $this->api->execute();
 
         if (!$result->status()) {

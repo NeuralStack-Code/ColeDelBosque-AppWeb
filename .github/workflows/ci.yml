@@ -1,0 +1,30 @@
+# Integración continua: en cada push y en cada pull request revisa que todo el PHP compile (8.1 y 8.3).
+# No necesita base de datos ni .env. Hostinger publica master aunque esto falle: revísalo antes de subir.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  php:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.3']
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mysqli, curl, gd, mbstring
+          coverage: none
+
+      - name: Sintaxis (php -l)
+        run: |
+          find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 -P4 php -l > /tmp/lint.log || { grep -v '^No syntax errors' /tmp/lint.log; exit 1; }

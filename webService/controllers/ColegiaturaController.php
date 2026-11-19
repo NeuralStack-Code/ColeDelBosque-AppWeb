@@ -9,12 +9,11 @@
  *   /colegiatura/descuento  → aplica o quita un descuento del catálogo
  *   /colegiatura/recargo    → cambia el recargo por mes vencido de un pago
  *   /colegiatura/eliminar   → baja de un pago
- * La URL anterior /administrador/colegiaturas redirige a /colegiatura/index (index.php raíz).
+ * La URL anterior /administrador/colegiaturas redirige a /colegiatura/index (tabla Rutas).
  */
 class ColegiaturaController extends Controller
 {
-    protected int $role = self::ADMIN;
-    protected array $readActions = ['index', 'listar', 'catalogos'];
+    public const MODULE = 'pagos';
 
     public function index(): void
     {
@@ -23,23 +22,23 @@ class ColegiaturaController extends Controller
 
     public function catalogos(): void
     {
-        $this->api->command('Ciclos', 'Ciclo', 'Active');
+        $this->api->command('Pagos', 'Colegiatura', 'ActiveCycle');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $ciclo = $result->row() ? Ciclo::fromRow($result->row()) : null;
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Groups');
+        $this->api->command('Pagos', 'Colegiatura', 'Groups');
         $this->api->addParameter('IdCiclo', 'I', $ciclo?->IdCiclo);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $grupos = GrupoOpcion::fromTable($result->table());
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Discounts');
+        $this->api->command('Pagos', 'Colegiatura', 'Discounts');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $descuentos = TipoDescuento::fromTable($result->table());
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Statuses');
+        $this->api->command('Pagos', 'Colegiatura', 'Statuses');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -56,7 +55,7 @@ class ColegiaturaController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Colegiaturas', 'Colegiatura', 'List');
+        $this->api->command('Pagos', 'Colegiatura', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -94,7 +93,7 @@ class ColegiaturaController extends Controller
         $concepto = $pago->esInscripcion() ? 'Inscripción' : 'Colegiatura ' . $pago->Mes;
         $comentario = ($completa && $pago->Abonado <= 0.005) ? $concepto : 'Abono — ' . $concepto;
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Pay');
+        $this->api->command('Pagos', 'Colegiatura', 'Pay');
         $this->api->addParameter('IdPago',     'I', $IdPago);
         $this->api->addParameter('Monto',      'N', $abono);
         $this->api->addParameter('TipoPago',   'S', $TipoPago);
@@ -121,7 +120,7 @@ class ColegiaturaController extends Controller
         $pago = $this->pago($IdPago);
         $this->ensure(strtolower($pago->Estatus) !== 'pagado', 'No se puede: el pago ya está registrado.', 409);
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'ApplyDiscount');
+        $this->api->command('Pagos', 'Colegiatura', 'ApplyDiscount');
         $this->api->addParameter('IdPago', 'I', $IdPago);
 
         if ($IdDescuento <= 0) {
@@ -136,7 +135,7 @@ class ColegiaturaController extends Controller
         $monto = round($pago->Monto * $descuento->Porcentaje / 100, 2);
         preg_match('/^.{0,60}/us', $descuento->Nombre, $concepto);   // el concepto que se guarda admite 60 caracteres
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'ApplyDiscount');
+        $this->api->command('Pagos', 'Colegiatura', 'ApplyDiscount');
         $this->api->addParameter('IdPago',            'I', $IdPago);
         $this->api->addParameter('Descuento',         'N', $monto);
         $this->api->addParameter('IdTipoDescuento',   'I', $IdDescuento);
@@ -156,7 +155,7 @@ class ColegiaturaController extends Controller
         $monto = filter_var($RecargoMonto ?? '', FILTER_VALIDATE_FLOAT);
         $this->ensure($monto !== false && $monto >= 0, 'El recargo no es válido.');
 
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Surcharge');
+        $this->api->command('Pagos', 'Colegiatura', 'Surcharge');
         $this->api->addParameter('IdPago',       'I', $IdPago);
         $this->api->addParameter('RecargoMonto', 'N', $monto);
         $result = $this->api->execute();
@@ -170,7 +169,7 @@ class ColegiaturaController extends Controller
 
     public function eliminar(int $IdPago): void
     {
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Delete');
+        $this->api->command('Pagos', 'Colegiatura', 'Delete');
         $this->api->addParameter('IdPago', 'I', $IdPago);
         $result = $this->api->execute();
 
@@ -185,7 +184,7 @@ class ColegiaturaController extends Controller
     /** El pago con lo abonado; corta con 404 si no existe. */
     private function pago(int $IdPago): Colegiatura
     {
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Get');
+        $this->api->command('Pagos', 'Colegiatura', 'Get');
         $this->api->addParameter('IdPago', 'I', $IdPago);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
@@ -196,7 +195,7 @@ class ColegiaturaController extends Controller
     /** Un descuento activo del catálogo; corta con 404 si no existe o está inactivo. */
     private function tipoDescuento(int $IdDescuento): TipoDescuento
     {
-        $this->api->command('Colegiaturas', 'Colegiatura', 'Discount');
+        $this->api->command('Pagos', 'Colegiatura', 'Discount');
         $this->api->addParameter('IdDescuento', 'I', $IdDescuento);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);

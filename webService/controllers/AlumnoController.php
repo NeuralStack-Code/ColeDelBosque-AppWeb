@@ -1,5 +1,4 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt() / decrypt(): matrícula y correos van encriptados
 require_once dirname(__DIR__, 2) . '/apiService/core/mail.php';     // enviarCorreo() → api central
 
 /**
@@ -9,13 +8,13 @@ require_once dirname(__DIR__, 2) . '/apiService/core/mail.php';     // enviarCor
  *   /alumno/guardar          → alta o cambio (al dar de alta con correo, la familia recibe su matrícula)
  *   /alumno/eliminar         → baja con todo lo suyo (colegiaturas, calificaciones, recibos)
  *   /alumno/enviarMatricula  → manda la matrícula al correo de los tutores
- * La URL anterior /administrador/alumnos redirige a /alumno/index (index.php raíz).
+ * La URL anterior /administrador/alumnos redirige a /alumno/index (tabla Rutas).
  */
 class AlumnoController extends Controller
 {
+    public const MODULE = 'escolar';
     use CuentasPersona;
 
-    protected int $role = self::ADMIN;
 
     public function index(): void
     {
@@ -24,7 +23,7 @@ class AlumnoController extends Controller
 
     public function listar(): void
     {
-        $this->success('Listado obtenido.', ['items' => $this->personas(self::PARENT)]);
+        $this->success('Listado obtenido.', ['items' => $this->personas(TipoCuenta::ALUMNO)]);
     }
 
     /** Sin IdCuenta es un alta (pide grupo); con ella, un cambio (IdGrupo vacío o 0 = no cambia el grupo). */
@@ -35,16 +34,16 @@ class AlumnoController extends Controller
         $correo1 = $this->correoTutor((string) $persona->CorreoTutor);
         $correo2 = $this->correoTutor((string) $persona->CorreoTutor2);
 
-        $this->api->command('Control_escolar', 'Persona', $persona->IdCuenta ? 'Update' : 'Insert');
+        $this->api->command('Escolar', 'Persona', $persona->IdCuenta ? 'Update' : 'Insert');
         if ($persona->IdCuenta) $this->api->addParameter('IdCuenta', 'I', $persona->IdCuenta);
-        $this->api->addParameter('IdPermiso',    'I', self::PARENT);
+        $this->api->addParameter('IdPermiso',    'I', TipoCuenta::ALUMNO);
         $this->api->addParameter('Nombre',       'S', $persona->Nombre);
         $this->api->addParameter('Paterno',      'S', $persona->Paterno);
         $this->api->addParameter('Materno',      'S', $persona->Materno);
         $this->api->addParameter('IdGrupo',      'I', $persona->IdGrupo);
-        $this->api->addParameter('Matricula',    'S', encrypt($persona->Matricula));   // se guarda encriptada
-        $this->api->addParameter('CorreoTutor',  'S', $correo1 === '' ? null : encrypt($correo1));
-        $this->api->addParameter('CorreoTutor2', 'S', $correo2 === '' ? null : encrypt($correo2));
+        $this->api->addParameter('Matricula',    'S', Cifrado::encrypt($persona->Matricula));   // se guarda encriptada
+        $this->api->addParameter('CorreoTutor',  'S', $correo1 === '' ? null : Cifrado::encrypt($correo1));
+        $this->api->addParameter('CorreoTutor2', 'S', $correo2 === '' ? null : Cifrado::encrypt($correo2));
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
 
@@ -77,19 +76,19 @@ class AlumnoController extends Controller
     /** Manda la matrícula a cada tutor. Regresa cuántos correos salieron (-1 = no tiene correo). Corta con 404 si no es un alumno. */
     private function mandarMatricula(int $IdCuenta): int
     {
-        $this->api->command('Control_escolar', 'Persona', 'MailData');
+        $this->api->command('Escolar', 'Persona', 'MailData');
         $this->api->addParameter('IdCuenta', 'I', $IdCuenta);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $this->ensure($result->row() !== null, 'No se encontró al alumno.', 404);
 
         $alumno = CorreoAlumno::fromRow($result->row());
-        $alumno->CorreoTutor  = $alumno->CorreoTutor  === null ? null : (string) decrypt($alumno->CorreoTutor);
-        $alumno->CorreoTutor2 = $alumno->CorreoTutor2 === null ? null : (string) decrypt($alumno->CorreoTutor2);
+        $alumno->CorreoTutor  = $alumno->CorreoTutor  === null ? null : (string) Cifrado::decrypt($alumno->CorreoTutor);
+        $alumno->CorreoTutor2 = $alumno->CorreoTutor2 === null ? null : (string) Cifrado::decrypt($alumno->CorreoTutor2);
         $correos = $alumno->correos();
         if (!$correos) return -1;
 
-        $html = CorreoMatricula::html($alumno->NombreCompleto, (string) decrypt((string) $alumno->Matricula));
+        $html = CorreoMatricula::html($alumno->NombreCompleto, (string) Cifrado::decrypt((string) $alumno->Matricula));
         $enviados = 0; $errores = [];
         foreach ($correos as $correo) {
             $error = enviarCorreo($correo, CorreoMatricula::asunto($alumno->NombreCompleto), $html, ['fromName' => 'Colegio del Bosque']);

@@ -1,0 +1,2 @@
+# Los scripts corren en Linux (Actions y Hostinger): siempre con LF, aunque se clone en Windows.
+*.sh text eol=lf

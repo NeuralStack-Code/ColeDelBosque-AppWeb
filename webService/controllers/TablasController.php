@@ -1,17 +1,15 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // decrypt(): las matrículas se guardan encriptadas
 
 /**
  * Visor de SOLO LECTURA de la base (solo el desarrollador).
  *   /tablas/index   → pantalla del visor
  *   /tablas/listar  → las tablas con su número de filas
  *   /tablas/ver     → las columnas y las primeras filas de una tabla (?Tabla=&Limite=)
- * La URL anterior /desarrollador/tablas redirige a /tablas/index (index.php raíz).
+ * La URL anterior /desarrollador/tablas redirige a /tablas/index (tabla Rutas).
  */
 class TablasController extends Controller
 {
-    protected int $role = self::DEVELOPER;
-    protected array $readActions = ['index', 'listar', 'ver'];
+    public const MODULE = 'sistema';
 
     public function index(): void
     {
@@ -20,7 +18,7 @@ class TablasController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Tablas', 'Tablas', 'List');
+        $this->api->command('Sistema', 'Tablas', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -35,14 +33,14 @@ class TablasController extends Controller
         $Limite = min(500, max(1, $Limite));
 
         // Las columnas se piden aparte: una tabla vacía no trae filas de dónde sacarlas.
-        $this->api->command('Tablas', 'Tablas', 'Columns');
+        $this->api->command('Sistema', 'Tablas', 'Columns');
         $this->api->addParameter('Tabla', 'S', $Tabla);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $columnas = array_column($result->table(), 'Columna');
         $this->ensure($Tabla !== '' && $columnas !== [], 'Tabla no válida.');
 
-        $this->api->command('Tablas', 'Tablas', 'Rows');
+        $this->api->command('Sistema', 'Tablas', 'Rows');
         $this->api->addParameter('Tabla',  'S', $Tabla);
         $this->api->addParameter('Limite', 'I', $Limite);
         $result = $this->api->execute();
@@ -52,7 +50,7 @@ class TablasController extends Controller
             // La matrícula está encriptada en la base: aquí se muestra legible.
             if (in_array('matricula', $columnas, true)) {
                 foreach ($filas as &$fila) {
-                    $clara = empty($fila['matricula']) ? '' : (string) decrypt($fila['matricula']);
+                    $clara = empty($fila['matricula']) ? '' : (string) Cifrado::decrypt($fila['matricula']);
                     if ($clara !== '') $fila['matricula'] = $clara;
                 }
                 unset($fila);

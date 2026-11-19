@@ -75,46 +75,69 @@ function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
     <h3 class="admin-seccion-tit">Accesos</h3>
     <div class="accesos-lista">
         <div class="acceso-panel">
+            <?php if (can('alumno/index')): ?>
             <a class="acceso" href="<?= $base ?>/alumno/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9"/></svg></span>
                 <span class="a-txt"><strong>Alumnos</strong><span>Altas, edición y bajas</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('docente/index')): ?>
             <a class="acceso" href="<?= $base ?>/docente/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c3 2.5 9 2.5 12 0v-5"/></svg></span>
                 <span class="a-txt"><strong>Maestros</strong><span>Altas, edición y bajas</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('grupo/index')): ?>
             <a class="acceso" href="<?= $base ?>/grupo/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
                 <span class="a-txt"><strong>Grupos</strong><span>Grupos, materias y maestra</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('materia/index')): ?>
             <a class="acceso" href="<?= $base ?>/materia/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg></span>
                 <span class="a-txt"><strong>Materias</strong><span>Catálogo de materias</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('recibo/index')): ?>
             <a class="acceso" href="<?= $base ?>/recibo/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg></span>
                 <span class="a-txt"><strong>Finanzas</strong><span>Recibos: ingresos y egresos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('colegiatura/index')): ?>
             <a class="acceso" href="<?= $base ?>/colegiatura/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/></svg></span>
                 <span class="a-txt"><strong>Colegiaturas</strong><span>Registro y estatus de pagos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('ciclo/index')): ?>
             <a class="acceso" href="<?= $base ?>/ciclo/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></span>
                 <span class="a-txt"><strong>Ciclo escolar</strong><span>Ciclos y periodos</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('reportecolumna/index')): ?>
             <a class="acceso" href="<?= $base ?>/reportecolumna/index">
                 <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
                 <span class="a-txt"><strong>Reporte semanal</strong><span>Columnas que capturan las maestras</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <?php endif; ?>
+            <?php if (can('reporte/index')): ?>
+            <a class="acceso" href="<?= $base ?>/reporte/index">
+                <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg></span>
+                <span class="a-txt"><strong>Crear reportes</strong><span>Capturar y enviar el reporte de cualquier grupo</span></span>
+                <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+            </a>
+            <?php endif; ?>
         </div>
     </div>
 

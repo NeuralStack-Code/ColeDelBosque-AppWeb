@@ -9,15 +9,13 @@ require_once dirname(__DIR__, 2) . '/apiService/core/mail.php';   // enviarCorre
  */
 class ContactoController extends Controller
 {
+    public const MODULE = 'sitio';
     /** No usa la base. */
     public const CONNECTION = 'ninguna';
 
-    protected array $publicActions = ['index', 'enviar'];
 
     public function index(): void
     {
-        // El administrador y el desarrollador trabajan en su panel.
-        if (in_array($this->roleId(), [self::ADMIN, self::DEVELOPER], true)) $this->redirect(self::homeOf($this->roleId()));
         $this->view('site/contacto');
     }
 

@@ -8,16 +8,16 @@ trait CuentasPersona
     /** Las cuentas del rol, con la matrícula y los correos ya descifrados. @return Persona[] */
     private function personas(int $permiso): array
     {
-        $this->api->command('Control_escolar', 'Persona', 'List');
+        $this->api->command('Escolar', 'Persona', 'List');
         $this->api->addParameter('IdPermiso', 'I', $permiso);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
 
         $personas = Persona::fromTable($result->table());
         foreach ($personas as $persona) {
-            $persona->Matricula    = (string) decrypt($persona->Matricula);
-            $persona->CorreoTutor  = $persona->CorreoTutor  === null ? '' : (string) decrypt($persona->CorreoTutor);
-            $persona->CorreoTutor2 = $persona->CorreoTutor2 === null ? '' : (string) decrypt($persona->CorreoTutor2);
+            $persona->Matricula    = (string) Cifrado::decrypt($persona->Matricula);
+            $persona->CorreoTutor  = $persona->CorreoTutor  === null ? '' : (string) Cifrado::decrypt($persona->CorreoTutor);
+            $persona->CorreoTutor2 = $persona->CorreoTutor2 === null ? '' : (string) Cifrado::decrypt($persona->CorreoTutor2);
         }
         return $personas;
     }
@@ -36,7 +36,7 @@ trait CuentasPersona
     /** Baja de la cuenta con todo lo suyo (recibos, colegiaturas, calificaciones) y su usuario. */
     private function eliminarPersona(int $IdCuenta): void
     {
-        $this->api->command('Control_escolar', 'Persona', 'Delete');
+        $this->api->command('Escolar', 'Persona', 'Delete');
         $this->api->addParameter('IdCuenta', 'I', $IdCuenta);
         $result = $this->api->execute();
 

@@ -131,6 +131,7 @@ body {
 .acceso:nth-child(6) .a-ico { background: var(--azul-osc); }
 .acceso:nth-child(7) .a-ico { background: #14b8a6; }
 .acceso:nth-child(8) .a-ico { background: #f97316; }
+.acceso:nth-child(9) .a-ico { background: #8b5cf6; }
 
 @media (max-width: 780px) { .dash-charts { grid-template-columns: 1fr; } }
 
@@ -285,3 +286,57 @@ dialog.modal.ancho { max-width: 1080px; }   /* modales con tabla (desglose, esta
 .chip button:hover { opacity: 1; }
 
 @media (max-width: 520px) { .fila-2 { grid-template-columns: 1fr; } }
+
+/* ---------- Catálogo de permisos: perfiles de una cuenta (dev/cuentas.php) ---------- */
+.nota-perfiles { color: var(--texto-suave); font-size: .9rem; margin: -6px 0 14px; }
+.lista-perfiles { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; }
+.modal-in .opcion-perfil { display: flex; align-items: flex-start; gap: 10px; margin: 0; padding: 10px; border: 1px solid var(--borde); border-radius: 10px; font-family: var(--fuente-texto); font-weight: 400; cursor: pointer; }
+.modal-in .opcion-perfil:hover { background: var(--fondo-alt); }
+.modal-in .opcion-perfil input { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; margin-top: 2px; accent-color: var(--azul-marca); }
+.opcion-perfil small { display: block; color: var(--texto-suave); font-size: .82rem; }
+.opcion-perfil.inactivo { opacity: .6; }
+.tabla .badge-estatus + .badge-estatus { margin-left: 4px; }
+
+/* ---------- Catálogo de permisos: árbol de lo que concede un perfil (dev/perfiles.php) ---------- */
+.marca-yo { font-size: .78rem; color: var(--azul-marca); font-weight: 700; margin-left: 6px; }
+.modal-in .modal-nota { color: var(--texto-suave); font-size: .9rem; margin: -6px 0 14px; }
+.modal-in .modal-nota[hidden] { display: none; }
+.arbol-herramientas { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+.arbol-herramientas[hidden] { display: none; }
+.arbol-herramientas input[type="search"] { flex: 1 1 240px; }
+.arbol-herramientas .btn { padding: .5em 1em; font-size: .85rem; }
+.arbol-permisos { max-height: 55vh; overflow-y: auto; padding-right: 4px; font-size: .9rem; }
+.arbol-permisos[hidden] { display: none; }
+.arbol-nodo { position: relative; }
+.arbol-hijos { display: none; margin-left: 15px; padding-left: 12px; border-left: 1px solid var(--borde); }
+.arbol-nodo.abierto > .arbol-hijos { display: block; }
+.arbol-oculto { display: none !important; }
+.arbol-fila { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 8px; }
+.arbol-fila:hover { background: var(--fondo-alt); }
+.arbol-modulo > .arbol-fila { margin-top: 6px; background: var(--azul-claro); }
+.arbol-toggle { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--texto-suave); cursor: pointer; flex: none; }
+.arbol-toggle svg { width: 16px; height: 16px; transition: transform .15s; }
+.arbol-nodo.abierto > .arbol-fila .arbol-toggle svg { transform: rotate(90deg); }
+.arbol-toggle-vacio { width: 24px; flex: none; }
+.modal-in .arbol-label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; min-width: 0; margin: 0; cursor: pointer; font-family: var(--fuente-texto); font-weight: 400; font-size: .9rem; }
+.modal-in .arbol-label input { width: 18px; height: 18px; flex: 0 0 auto; padding: 0; accent-color: var(--azul-marca); }
+.arbol-label:has(input:disabled) { cursor: not-allowed; opacity: .6; }
+.arbol-modulo > .arbol-fila .arbol-nombre { font-weight: 700; }
+.arbol-menu > .arbol-fila .arbol-nombre { font-weight: 600; }
+.arbol-ruta { font-size: .76rem; color: var(--texto-suave); overflow-wrap: anywhere; }
+.arbol-tag { font-size: .62rem; text-transform: uppercase; letter-spacing: .6px; padding: .1em .5em; border-radius: 999px; border: 1px solid var(--borde); color: var(--texto-suave); white-space: nowrap; }
+.arbol-tag-modulo { color: var(--azul-marca); border-color: var(--azul-marca); }
+.arbol-tag-menu   { color: #1d4ed8; border-color: #93c5fd; }
+.arbol-tag-vista  { color: #b45309; border-color: #fcd34d; }
+.arbol-lock { width: 14px; height: 14px; color: var(--texto-suave); }
+.arbol-cuenta { margin-left: auto; font-size: .74rem; color: var(--texto-suave); font-variant-numeric: tabular-nums; flex: none; }
+.arbol-aparte { margin: 4px 0 6px; padding: 6px 4px 2px; border: 1px dashed var(--borde); border-radius: 8px; }
+.arbol-aparte-titulo { font-size: .68rem; text-transform: uppercase; letter-spacing: .6px; color: var(--texto-suave); padding: 0 6px 3px; }
+.arbol-coincide > .arbol-fila { background: #efeaff; }
+.arbol-vacio { color: var(--texto-suave); padding: 16px 6px; }
+@media (max-width: 600px) {
+    .modal-in { padding: 22px 18px; }
+    .arbol-ruta { flex-basis: 100%; }
+    .arbol-hijos { margin-left: 8px; padding-left: 8px; }
+    .tabla .col-desc { display: none; }   /* Perfiles: en celular la descripción se ve al editar */
+}

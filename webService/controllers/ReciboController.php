@@ -7,22 +7,11 @@
  *   /recibo/guardar    → alta o cambio
  *   /recibo/eliminar   → baja
  *   /recibo/imprimir   → el recibo para imprimir o guardar en PDF (?IdRecibo=)
- * Las URLs anteriores /administrador/recibos y /recibo?id= redirigen aquí (index.php raíz).
+ * Las URLs anteriores /administrador/recibos y /recibo?id= redirigen aquí (tabla Rutas).
  */
 class ReciboController extends Controller
 {
-    protected int $role = self::ADMIN;
-    protected array $readActions = ['index', 'listar', 'catalogos', 'imprimir'];
-
-    /** El recibo impreso también lo abre el alumno: ahí basta la sesión y el método revisa que sea suyo. */
-    public function authorize(string $action): void
-    {
-        if ($action === 'imprimir') {
-            $this->requireScreen();
-            return;
-        }
-        parent::authorize($action);
-    }
+    public const MODULE = 'pagos';
 
     public function index(): void
     {
@@ -31,19 +20,19 @@ class ReciboController extends Controller
 
     public function catalogos(): void
     {
-        $this->api->command('Tipos_recibo', 'TipoRecibo', 'List');
+        $this->api->command('Pagos', 'TipoRecibo', 'List');
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $tipos = TipoRecibo::fromTable($result->table());
 
-        $this->api->command('Recibos', 'Recibo', 'People');
-        $this->api->addParameter('IdPermiso', 'I', self::PARENT);
+        $this->api->command('Pagos', 'Recibo', 'People');
+        $this->api->addParameter('IdPermiso', 'I', TipoCuenta::ALUMNO);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
         $alumnos = PersonaOpcion::fromTable($result->table());
 
-        $this->api->command('Recibos', 'Recibo', 'People');
-        $this->api->addParameter('IdPermiso', 'I', self::TEACHER);
+        $this->api->command('Pagos', 'Recibo', 'People');
+        $this->api->addParameter('IdPermiso', 'I', TipoCuenta::MAESTRO);
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -56,7 +45,7 @@ class ReciboController extends Controller
     /** Los recibos y el balance (ingresos menos egresos). */
     public function listar(): void
     {
-        $this->api->command('Recibos', 'Recibo', 'List');
+        $this->api->command('Pagos', 'Recibo', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -78,9 +67,9 @@ class ReciboController extends Controller
         $fecha = $recibo->Fecha === '' ? date('Y-m-d H:i:s') : str_replace('T', ' ', $recibo->Fecha);
 
         if (!$recibo->IdRecibo) {
-            $this->api->command('Recibos', 'Recibo', 'Insert');
+            $this->api->command('Pagos', 'Recibo', 'Insert');
         } else {
-            $this->api->command('Recibos', 'Recibo', 'Update');
+            $this->api->command('Pagos', 'Recibo', 'Update');
             $this->api->addParameter('IdRecibo', 'I', $recibo->IdRecibo);
         }
         $this->api->addParameter('IdTipoRecibo',     'I', $recibo->IdTipoRecibo ?: null);
@@ -103,7 +92,7 @@ class ReciboController extends Controller
 
     public function eliminar(int $IdRecibo): void
     {
-        $this->api->command('Recibos', 'Recibo', 'Delete');
+        $this->api->command('Pagos', 'Recibo', 'Delete');
         $this->api->addParameter('IdRecibo', 'I', $IdRecibo);
         $result = $this->api->execute();
 
@@ -118,7 +107,7 @@ class ReciboController extends Controller
     /** El recibo para imprimir. El administrador ve cualquiera; el alumno, solo los suyos. $id es el de la URL anterior (/recibo?id=). */
     public function imprimir(int $IdRecibo = 0, int $id = 0): void
     {
-        $this->api->command('Recibos', 'Recibo', 'Get');
+        $this->api->command('Pagos', 'Recibo', 'Get');
         $this->api->addParameter('IdRecibo', 'I', $IdRecibo ?: $id);
         $result = $this->api->execute();
         if ($result->status()) $this->failure($result);
@@ -130,12 +119,14 @@ class ReciboController extends Controller
         }
         $recibo = Recibo::fromRow($result->row());
 
-        $propio = $this->roleId() === self::PARENT && $recibo->IdUsuarioCuenta === $this->userId() && $recibo->IdPermisoCuenta === self::PARENT;
-        if (!$this->isAdmin() && !$propio) {
+        // El catálogo deja entrar a cualquier cuenta con sesión: quien administra recibos ve todos; los demás, solo los suyos.
+        $administra = $this->granted('index');
+        $propio = $recibo->IdUsuarioCuenta === $this->userId() && $recibo->IdPermisoCuenta === TipoCuenta::ALUMNO;
+        if (!$administra && !$propio) {
             http_response_code(403);
             exit('No tienes acceso a este recibo.');
         }
 
-        $this->view('recibo', ['recibo' => $recibo, 'volver' => $this->isAdmin() ? '/recibo/index' : '/padre/index']);
+        $this->view('recibo', ['recibo' => $recibo, 'volver' => $administra ? '/recibo/index' : '/padre/index']);
     }
 }

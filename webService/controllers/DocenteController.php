@@ -1,5 +1,4 @@
 <?php
-require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt() / decrypt(): la matrícula va encriptada
 
 /**
  * Maestros (solo el administrador). Se llama Docente porque /maestro ya es la pantalla de inicio de la maestra.
@@ -8,13 +7,13 @@ require_once dirname(__DIR__, 2) . '/apiService/core/crypto.php';   // encrypt()
  *   /docente/guardar   → alta o cambio
  *   /docente/eliminar  → baja (sus grupos quedan sin asignar)
  * Un maestro tiene su grupo, da inglés en uno o varios niveles, o las dos cosas.
- * La URL anterior /administrador/maestros redirige a /docente/index (index.php raíz).
+ * La URL anterior /administrador/maestros redirige a /docente/index (tabla Rutas).
  */
 class DocenteController extends Controller
 {
+    public const MODULE = 'escolar';
     use CuentasPersona;
 
-    protected int $role = self::ADMIN;
 
     public function index(): void
     {
@@ -23,7 +22,7 @@ class DocenteController extends Controller
 
     public function listar(): void
     {
-        $this->success('Listado obtenido.', ['items' => $this->personas(self::TEACHER)]);
+        $this->success('Listado obtenido.', ['items' => $this->personas(TipoCuenta::MAESTRO)]);
     }
 
     /**
@@ -44,17 +43,17 @@ class DocenteController extends Controller
         }
         $this->validarPersona($persona);
 
-        $this->api->command('Control_escolar', 'Persona', $persona->IdCuenta ? 'Update' : 'Insert');
+        $this->api->command('Escolar', 'Persona', $persona->IdCuenta ? 'Update' : 'Insert');
         if ($persona->IdCuenta) {
             $this->api->addParameter('IdCuenta', 'I', $persona->IdCuenta);
             $this->api->addParameter('SinGrupo', 'B', $SinGrupo);
         }
-        $this->api->addParameter('IdPermiso',     'I', self::TEACHER);
+        $this->api->addParameter('IdPermiso',     'I', TipoCuenta::MAESTRO);
         $this->api->addParameter('Nombre',        'S', $persona->Nombre);
         $this->api->addParameter('Paterno',       'S', $persona->Paterno);
         $this->api->addParameter('Materno',       'S', $persona->Materno);
         $this->api->addParameter('IdGrupo',       'I', $persona->IdGrupo);
-        $this->api->addParameter('Matricula',     'S', encrypt($persona->Matricula));   // se guarda encriptada
+        $this->api->addParameter('Matricula',     'S', Cifrado::encrypt($persona->Matricula));   // se guarda encriptada
         $this->api->addParameter('NivelesIngles', 'S', $niveles);
         $result = $this->api->execute();
 

@@ -5,11 +5,11 @@
  *   /tipodescuento/listar    → los descuentos
  *   /tipodescuento/guardar   → alta (nace activo) o cambio (también lo activa o desactiva)
  *   /tipodescuento/eliminar  → baja (si no hay pagos con ese descuento)
- * La URL anterior /administrador/tipos-descuento redirige a /tipodescuento/index (index.php raíz).
+ * La URL anterior /administrador/tipos-descuento redirige a /tipodescuento/index (tabla Rutas).
  */
 class TipoDescuentoController extends Controller
 {
-    protected int $role = self::ADMIN;
+    public const MODULE = 'pagos';
 
     public function index(): void
     {
@@ -18,7 +18,7 @@ class TipoDescuentoController extends Controller
 
     public function listar(): void
     {
-        $this->api->command('Tipos_descuento', 'TipoDescuento', 'List');
+        $this->api->command('Pagos', 'TipoDescuento', 'List');
         $result = $this->api->execute();
 
         if (!$result->status()) {
@@ -38,9 +38,9 @@ class TipoDescuentoController extends Controller
         $this->ensure(in_array($descuento->AplicaA, TipoDescuento::TARGETS, true), 'El descuento aplica a colegiatura o a inscripción.');
 
         if (!$descuento->IdDescuento) {
-            $this->api->command('Tipos_descuento', 'TipoDescuento', 'Insert');
+            $this->api->command('Pagos', 'TipoDescuento', 'Insert');
         } else {
-            $this->api->command('Tipos_descuento', 'TipoDescuento', 'Update');
+            $this->api->command('Pagos', 'TipoDescuento', 'Update');
             $this->api->addParameter('IdDescuento', 'I', $descuento->IdDescuento);
             $this->api->addParameter('Activo',      'B', $descuento->Activo);
         }
@@ -59,7 +59,7 @@ class TipoDescuentoController extends Controller
 
     public function eliminar(int $IdDescuento): void
     {
-        $this->api->command('Tipos_descuento', 'TipoDescuento', 'Delete');
+        $this->api->command('Pagos', 'TipoDescuento', 'Delete');
         $this->api->addParameter('IdDescuento', 'I', $IdDescuento);
         $result = $this->api->execute();
 

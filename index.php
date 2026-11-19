@@ -1,20 +1,31 @@
 <?php
+// Los errores van al log, nunca a la pantalla (mostrarían rutas internas y responderían 200 en lugar de 500).
+ini_set('display_errors', '0');
+
 // Archivos estáticos: el built-in server los sirve directo si el router retorna false
 if (php_sapi_name() === 'cli-server') {
     $requestPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
     $staticFile  = __DIR__ . $requestPath;
+    // Lo mismo que bloquea el .htaccess en Apache: código interno, apiService/storage/ privado y cualquier .php que no sea una entrada.
+    if (preg_match('#^/(sql|docs|apiService/(core|middleware|storage|tests|tools)|webService/(controllers|business|models|libs|views|sql))(/|$)#i', $requestPath)
+        || (preg_match('#\.php$#i', $requestPath) && !in_array($requestPath, ['/index.php', '/apiService/index.php'], true))) {
+        http_response_code(403); exit;
+    }
     if ($requestPath !== '/index.php' && is_file($staticFile)) return false;
 }
 
-session_start();
+// Arranque: el core y el cargador propio (apiService/core/autoload.php + Loader.php). Sin Composer ni vendor/.
 require_once __DIR__ . '/apiService/core/autoload.php';
+
+startSecureSession();
+sendSecurityHeaders();
 require_once __DIR__ . '/apiService/core/config.php';
 require_once __DIR__ . '/apiService/core/checkLicense.php';
 checkLicense();
 
 $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// API → apiService/index.php (en producción lo maneja .htaccess)
+// API → apiService/index.php (el .htaccess lo maneja en producción; aquí cubre el dev server)
 if (preg_match('#^/?api(/|$)#', $uri)) {
     require __DIR__ . '/apiService/index.php';
     exit;
@@ -30,77 +41,14 @@ $route = trim($uri, '/');
 $route = strtok($route, '?');
 if ($route === false) $route = '';
 
-$routes = [
-    ''                  => __DIR__ . '/webService/views/home.php',
-    'index.php'         => __DIR__ . '/webService/views/home.php',
-    'oferta-educativa'  => __DIR__ . '/webService/views/site/oferta_educativa.php',
-    'actividades'       => __DIR__ . '/webService/views/site/actividades.php',
-
-    //Maestro (permiso_id = 2)
-    'maestro'                 => __DIR__ . '/webService/views/maestro/home.php',
-
-
-    //Desarrollador (permiso_id = 4)
-    'desarrollador'            => __DIR__ . '/webService/views/dev/home.php',
-];
-
-// Pantallas que ya son /<controller>/<método>. Las URLs anteriores redirigen (301) conservando el query string.
-$moved = [
-    'inicio-sesion'        => '/auth/entrar',
-    'administrador/ciclos' => '/ciclo/index',
-    'administrador'                 => '/dashboard/index',
-    'administrador/tipos-recibo'    => '/tiporecibo/index',
-    'administrador/tipos-descuento' => '/tipodescuento/index',
-    'desarrollador/permisos'        => '/permiso/index',
-    'desarrollador/tablas'          => '/tablas/index',
-    'administrador/materias'        => '/materia/index',
-    'desarrollador/perfiles'        => '/perfil/index',
-    'padre'                         => '/padre/index',
-    'administrador/colegiaturas'    => '/colegiatura/index',
-    'administrador/esquemas-pago'   => '/esquemapago/index',
-    'administrador/recibos'         => '/recibo/index',
-    'recibo'                        => '/recibo/imprimir',
-    'administrador/reporte-columnas' => '/reportecolumna/index',
-    'maestro/calificaciones'        => '/calificacion/index',
-    'maestro/reportes'              => '/reporte/index',
-    'administrador/alumnos'         => '/alumno/index',
-    'administrador/maestros'        => '/docente/index',
-    'administrador/grupos'          => '/grupo/index',
-];
-if (isset($moved[$route])) {
-    $query = $_SERVER['QUERY_STRING'] ?? '';
-    header('Location: ' . BASE_URL . $moved[$route] . ($query !== '' ? '?' . $query : ''), true, 301);
-    exit;
-}
-
-// Los candados de abajo son de las páginas sueltas de $routes. Las pantallas que ya son de un controller
-// revisan el rol ellas mismas (Controller::authorize), y sus métodos los usa el panel de cada rol.
-$isPage = array_key_exists($route, $routes);
-
-// Admin encerrado en su panel: solo puede navegar rutas 'administrador' y 'administrador/*' (+ recibo)
-if ($isPage && isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 1) {
-    if ($route !== 'administrador' && strpos($route, 'administrador/') !== 0 && $route !== 'recibo') {
-        header('Location: ' . BASE_URL . '/dashboard/index');
-        exit;
-    }
-}
-
-// Desarrollador encerrado en su panel: solo 'desarrollador' y 'desarrollador/*'
-if ($isPage && isset($_SESSION['permiso']) && (int)$_SESSION['permiso'] === 4) {
-    if ($route !== 'desarrollador' && strpos($route, 'desarrollador/') !== 0) {
-        header('Location: ' . BASE_URL . '/desarrollador');
-        exit;
-    }
-}
-
-// 1) Páginas sueltas de $routes.  2) /<controller>/<método> (controllers que heredan de Controller;
-//    lo despacha el router de apiService).  3) 404.
-if ($isPage) {
-    require $routes[$route];
-} elseif (($class = routeController(explode('/', $route)[0])) !== null
-          && method_exists($class, explode('/', $route, 2)[1] ?? 'index')) {
-    require __DIR__ . '/apiService/index.php';
+// Las rutas viven en la base (tabla Rutas, ver core/Rutas.php): páginas sueltas del sitio y URLs que mandan a otra.
+// Todo lo demás es /<componente>/<método>: lo despacha el router de la api, que le pregunta al catálogo qué existe
+// y si el perfil de la cuenta lo permite (y responde 404 si no está registrado). Aquí no se registra ninguna ruta.
+$destino = Rutas::resolver($route);
+if ($destino !== null && $destino['Tipo'] === 'redireccion') Rutas::redirigir($destino);
+if ($destino !== null && $destino['Tipo'] === 'vista') {
+    $base = BASE_URL;
+    require Rutas::vista($destino);
 } else {
-    http_response_code(404);
-    require __DIR__ . '/webService/views/404.php';
+    require __DIR__ . '/apiService/index.php';
 }
