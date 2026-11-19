@@ -119,6 +119,11 @@ function olaSep(string $fill = 'rgba(91,62,224,.07)'): void { ?>
                 <span class="a-txt"><strong>Reporte semanal</strong><span>Columnas que capturan las maestras</span></span>
                 <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
             </a>
+            <a class="acceso" href="<?= $base ?>/administrador/reportes">
+                <span class="a-ico"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg></span>
+                <span class="a-txt"><strong>Crear reportes</strong><span>Capturar y enviar el reporte de cualquier grupo</span></span>
+                <span class="chev"><svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>
+            </a>
         </div>
     </div>
 

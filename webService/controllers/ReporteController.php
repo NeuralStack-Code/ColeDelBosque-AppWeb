@@ -2,8 +2,9 @@
 
 /**
  * Recurso: reportes.  Ruta: /api/reportes?action=contexto|semana|clase|guardar_clase|eliminar_clase|vista_previa|enviar
- * Reporte semanal a papás. Solo maestros (permiso 2), acotado a sus grupos: el propio (todas las
- * materias) y los de sus niveles de inglés (solo Inglés). El grupo llega en grupo_id.
+ * Reporte semanal a papás. Maestros (permiso 2), acotado a sus grupos: el propio (todas las
+ * materias) y los de sus niveles de inglés (solo Inglés). El administrador (permiso 1) trabaja con
+ * todos los grupos del ciclo activo y todas sus materias. El grupo llega en grupo_id.
  */
 class ReporteController
 {
@@ -20,8 +21,9 @@ class ReporteController
     public function __construct(mysqli $conexion)
     {
         requireAuth();
-        if ((int) ($_SESSION['permiso'] ?? 0) !== 2) {
-            response(403, false, 'Solo los maestros pueden acceder a los reportes.');
+        $permiso = (int) ($_SESSION['permiso'] ?? 0);
+        if ($permiso !== 1 && $permiso !== 2) {
+            response(403, false, 'Solo los maestros y el administrador pueden acceder a los reportes.');
         }
         $this->rep    = new ReporteBusiness($conexion);
         $this->cols   = new ReporteColumnaBusiness($conexion);
@@ -33,8 +35,13 @@ class ReporteController
         $this->ciclo   = $ciclo;
         $this->cicloId = (int) $ciclo['id_ciclo'];
 
-        $this->grupos = $this->cal->gruposDelMaestro((int) ($_SESSION['id'] ?? 0), $this->cicloId);
-        if (!$this->grupos) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
+        if ($permiso === 1) {
+            $this->grupos = $this->cal->gruposDelCiclo($this->cicloId);
+            if (!$this->grupos) response(409, false, 'No hay grupos en el ciclo activo.');
+        } else {
+            $this->grupos = $this->cal->gruposDelMaestro((int) ($_SESSION['id'] ?? 0), $this->cicloId);
+            if (!$this->grupos) response(409, false, 'No tienes un grupo asignado. Contacta a la administración.');
+        }
 
         // Grupo pedido por la vista; sin él (o si no es suyo) se usa el primero
         $pedido = (int) ($_REQUEST['grupo_id'] ?? 0);

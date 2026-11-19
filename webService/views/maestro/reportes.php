@@ -1,5 +1,5 @@
 <?php
-$rol = 2; // solo maestros
+$rol = [1, 2]; // maestros y administrador (/administrador/reportes)
 require __DIR__ . '/../partials/guard.php';
 
 $base     = BASE_URL;
@@ -7,6 +7,8 @@ $title    = 'Reporte semanal | Colegio del Bosque';
 $extraCss = ['maestro.css'];
 $img      = $base . '/webService/wwwroot/img';
 $nombre   = $_SESSION['usuario'] ?? 'Maestro';
+$esAdmin  = (int) ($_SESSION['permiso'] ?? 0) === 1;
+$panel    = $esAdmin ? '/administrador' : '/maestro';
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -17,9 +19,9 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
     <!-- Topbar -->
     <header class="panel-top">
         <div class="contenedor inner">
-            <a href="<?= $base ?>/maestro" class="marca">
+            <a href="<?= $base . $panel ?>" class="marca">
                 <img src="<?= $img ?>/logo.png" alt="Colegio del Bosque">
-                <span>Colegio del Bosque<small>Panel del maestro</small></span>
+                <span>Colegio del Bosque<small><?= $esAdmin ? 'Panel del administrador' : 'Panel del maestro' ?></small></span>
             </a>
             <div style="display:flex;align-items:center;gap:1.2em;">
                 <span class="user">Hola, <strong><?= htmlspecialchars($nombre) ?></strong></span>
@@ -31,7 +33,7 @@ $nombre   = $_SESSION['usuario'] ?? 'Maestro';
         </div>
     </header>
 
-    <a class="volver-panel" href="<?= $base ?>/maestro">
+    <a class="volver-panel" href="<?= $base . $panel ?>">
         <svg class="ic-s" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
         Regresar al panel
     </a>

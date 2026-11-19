@@ -62,6 +62,21 @@ class CalificacionBusiness
         return $grupos;
     }
 
+    /** Todos los grupos del ciclo (para el administrador): todas sus materias, no solo Inglés. */
+    public function gruposDelCiclo(int $cicloId): array
+    {
+        $q = mysqli_prepare($this->db, 'SELECT id_grupo, grado FROM grupo WHERE ciclo_id = ? AND id_grupo <> 0 ORDER BY nivel, grado');
+        mysqli_stmt_bind_param($q, 'i', $cicloId);
+        mysqli_stmt_execute($q);
+        $res = mysqli_stmt_get_result($q);
+        $grupos = [];
+        while ($r = mysqli_fetch_assoc($res)) {
+            $grupos[] = ['id_grupo' => (int) $r['id_grupo'], 'grado' => $r['grado'], 'solo_ingles' => false];
+        }
+        mysqli_stmt_close($q);
+        return $grupos;
+    }
+
     public function materiaEnGrupo(int $materiaId, int $grupoId, bool $soloIngles = false): bool
     {
         $stmt = mysqli_prepare($this->db,

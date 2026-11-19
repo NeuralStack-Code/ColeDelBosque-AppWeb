@@ -62,6 +62,7 @@ $routes = [
     'administrador/ciclos'        => __DIR__ . '/webService/views/admin/ciclos.php',
     'administrador/esquemas-pago' => __DIR__ . '/webService/views/admin/esquemas_pago.php',
     'administrador/reporte-columnas' => __DIR__ . '/webService/views/admin/reporte_columnas.php',
+    'administrador/reportes'      => __DIR__ . '/webService/views/maestro/reportes.php',   // la misma pantalla de la maestra
 
     //Desarrollador (permiso_id = 4)
     'desarrollador'            => __DIR__ . '/webService/views/dev/home.php',
