@@ -169,7 +169,7 @@ ensayo)
   # producción (primero las corridas a mano, sin aplicado.txt; luego por la fecha de su aplicado.txt): así una que
   # necesita a otra del mismo día no falla en el ensayo (2026-11-04: instalador-cliente necesita versiones-proyectos).
   dia=""; n=0
-  for d in $(for c in desplegado/*/; do c="${c%/}"; e="${c#desplegado/}"
+  for d in $(for c in desplegado/*/; do [ -d "$c" ] || continue; c="${c%/}"; e="${c#desplegado/}"   # sin entregas desplegadas, el patrón queda literal
                t="$(head -n1 "$c/aplicado.txt" 2>/dev/null | tr -d '\r' || true)"
                printf '%s\t%s\t%s\t%s\n' "${e:0:10}" "${t:+1}" "$t" "$e"; done | LC_ALL=C sort | cut -f4); do
     [[ -n "$HASTA" && ! "$d" > "$HASTA" ]] && continue
