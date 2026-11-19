@@ -22,7 +22,8 @@ set -euo pipefail
 
 MODO="${1:-}"
 RAIZ="$(pwd)"
-[ -d "$RAIZ/pendiente" ] && [ -f "$RAIZ/automatizacion/servidor.sh" ] || { echo "Correr desde la raíz de DeployBacklog." >&2; exit 2; }
+[ -f "$RAIZ/automatizacion/servidor.sh" ] || { echo "Correr desde la raíz de DeployBacklog." >&2; exit 2; }
+mkdir -p "$RAIZ/pendiente"   # git no guarda carpetas vacías: sin entregas pendientes, la carpeta no viene en el checkout
 DUENO="${DUENO:-NeuralStack-Code}"
 RAMA="${RAMA:-DeployBacklog}"
 RUTA_SITIO="${RUTA_SITIO:-}"
