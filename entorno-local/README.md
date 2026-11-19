@@ -64,6 +64,12 @@ Entra a http://localhost:8787/auth/entrar con una matrícula de prueba:
 
 En el Claude de escritorio están como `colegio-local` y `colegio-local-api` (`.claude/launch.json`).
 
+## Pruebas automáticas
+
+Copia tu `entorno-local/.env.local` como `.env.pruebas` en la raíz del código. Luego, desde ahí:
+`php apiService/tests/run.php`. Corre `unit`, `permisos` y `rutas` contra tu base local; las cuentas de prueba se
+crean y se borran solas.
+
 ## Cuando entra una entrega nueva
 
 Quien agrega la entrega a `pendiente/` regenera el archivo y lo sube junto con ella:
