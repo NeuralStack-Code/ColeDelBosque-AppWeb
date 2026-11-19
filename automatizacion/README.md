@@ -50,6 +50,8 @@ En **ColeDelBosque-AppWeb** → *Settings → Secrets and variables → Actions*
 
 Además: *Settings → Actions → General → Workflow permissions* → **Read and write** (para mover a `desplegado/`).
 
+Estado: secretos SSH, `RUTA_SITIO` y permiso de escritura configurados el 2026-11-19.
+
 Primera vez: Actions → *SQL a producción* → `revisar`. Muestra cliente, conexión y permisos sin cambiar nada.
 
 ## Primer despliegue (el SQL ANTES que el código)
