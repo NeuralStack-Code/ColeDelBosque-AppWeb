@@ -30,6 +30,8 @@ Al terminar, la entrega pasa a `desplegado/` con su `aplicado.txt` y un commit `
 - Que el código anterior siga funcionando con la base nueva. Hostinger publica `master` alrededor de un minuto antes de
   que la Action aplique el SQL. Por eso lo nuevo **se sube primero a DeployBacklog** y después el código a `master`.
 - Lo que no es SQL (archivos que hay que borrar en el servidor, `.env`) va anotado en el `DESPLIEGUE.md` de la entrega.
+- Después de agregarla, `python entorno-local/armar.py` y subir el `entorno-local/mysql8/01_colegio.sql` nuevo junto con
+  ella (ver `entorno-local/README.md`).
 
 ## Configuración (una sola vez, la hace ella)
 
