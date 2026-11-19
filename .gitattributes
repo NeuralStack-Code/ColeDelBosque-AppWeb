@@ -1,0 +1,3 @@
+# Los scripts corren en Linux (Actions y Hostinger): siempre con saltos de línea LF, aunque se clone en Windows.
+*.sh text eol=lf
+automatizacion/pruebas/gh text eol=lf

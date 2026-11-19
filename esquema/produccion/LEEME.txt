@@ -1,0 +1,1 @@
+# Va aquí colegio.sql: export de SOLO estructura de la base de producción (phpMyAdmin → Exportar → Personalizado → Estructura).

@@ -1,0 +1,50 @@
+# SQL a producción, disparado por un push a DeployBacklog. Guía: automatizacion/README.md
+#
+# 1. Ensayo: MariaDB 11.8 desechable con esquema/produccion + desplegado/ + TODAS las pendientes (también las que
+#    esperan una rama). Si una entrega no corre aquí, no llega a producción.
+# 2. Producción: aplica las entregas LISTAS (sin espera.txt, o con su rama ya en master), las registra en Migraciones
+#    y las mueve a desplegado/ con un commit "[skip ci]".
+#
+# El mismo proceso corre al subir a master de ColeDelBosque-AppWeb (.github/workflows/sql-produccion.yml de master).
+# El grupo de concurrencia evita dos corridas a la vez dentro de este repo; entre repos (WebSite, apiWebSite), el
+# candado del servidor.
+name: SQL a producción
+
+on:
+  push:
+    branches: [DeployBacklog]
+
+concurrency:
+  group: sql-produccion
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # mover las entregas a desplegado/
+
+jobs:
+  sql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Ensayo (MariaDB 11.8 desechable)
+        run: bash automatizacion/desplegar.sh ensayo
+
+      - name: Aplicar en producción las entregas listas
+        env:
+          ENSAYO: '0'
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+          RUTA_SITIO: ${{ vars.RUTA_SITIO }}
+          GH_TOKEN: ${{ secrets.DEPLOY_TOKEN || github.token }}
+          DISPARO: push a DeployBacklog (${{ github.sha }}) por ${{ github.actor }}
+        run: |
+          if [ -z "$SSH_HOST" ]; then
+            echo "::warning::Faltan los secretos SSH_* del repo: solo se hizo el ensayo. Ver automatizacion/README.md."
+            exit 0
+          fi
+          bash automatizacion/desplegar.sh produccion
