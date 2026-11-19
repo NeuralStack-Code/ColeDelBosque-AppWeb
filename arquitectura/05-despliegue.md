@@ -2,7 +2,7 @@
 
 | Rama | Qué tiene | Qué pasa al subir |
 |---|---|---|
-| `master` | Solo código | Hostinger lo publica solo. Corren **CI** (`php -l` 8.1 y 8.3), **Integración** (base MariaDB 11.8 con todo el SQL + catálogo) y **SQL a producción** (aplica las entregas listas) |
+| `master` | Solo código | Hostinger lo publica solo. Corren **CI** (`php -l` 8.1 y 8.3, PHPStan, pruebas unitarias), **Auditoría** (secretos, archivos prohibidos, `.htaccess`, commits), **Integración** (base MariaDB 11.8 con todo el SQL + catálogo + todas las suites) y **SQL a producción** (aplica las entregas listas) |
 | `DeployBacklog` (huérfana) | El SQL: `pendiente/`, `desplegado/`, `esquema/produccion/colegio.sql`, `automatizacion/` | Ensayo en MariaDB 11.8 y, si pasa, aplica las entregas listas |
 | `Documentacion` (huérfana) | Esto | Nada |
 
