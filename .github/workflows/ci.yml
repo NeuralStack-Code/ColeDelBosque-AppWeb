@@ -1,5 +1,6 @@
-# Integración continua: en cada push y en cada pull request revisa que todo el PHP compile (8.1 y 8.3).
-# No necesita base de datos ni .env. Hostinger publica master aunque esto falle: revísalo antes de subir.
+# Integración continua: en cada push y en cada pull request revisa que todo el PHP compile (8.1 y 8.3), corre el
+# análisis estático (phpstan.neon) y las pruebas unitarias. No necesita base de datos ni .env.
+# Hostinger publica master aunque esto falle: córrelo antes de subir (ver apiService/tests/run.php).
 name: CI
 
 on:
@@ -23,8 +24,15 @@ jobs:
         with:
           php-version: ${{ matrix.php }}
           extensions: mysqli, curl, gd, mbstring
+          tools: phpstan:2.1.17
           coverage: none
 
       - name: Sintaxis (php -l)
         run: |
           find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n1 -P4 php -l > /tmp/lint.log || { grep -v '^No syntax errors' /tmp/lint.log; exit 1; }
+
+      - name: Análisis estático (PHPStan)
+        run: phpstan analyse --no-progress --memory-limit=1G
+
+      - name: Pruebas unitarias
+        run: php apiService/tests/run.php --sin-base

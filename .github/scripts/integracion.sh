@@ -8,13 +8,14 @@
 # 2. Revisa que el catálogo de permisos que genera el CÓDIGO sea el mismo que ya trae el SQL (huella de
 #    CatalogoVersion). Si un controller cambió y falta la entrega con la semilla nueva, falla.
 # 3. Revisa el router contra la base: una ruta pública existe y una ruta inventada no.
+# 4. Corre TODAS las suites de pruebas (apiService/tests) contra esa base, con el sitio levantado.
 #
 # Variables: DB_HOST DB_PORT DB_USER DB_PASSWORD (la MariaDB del servicio de la Action).
 set -euo pipefail
 
 DBL="${1:?uso: integracion.sh <checkout de DeployBacklog>}"
 RAIZ="$(pwd)"
-BASE=colegio_ci
+BASE=colegio_ci_local          # las pruebas solo corren contra bases *_local
 ESQUEMA="$DBL/esquema/produccion/colegio.sql"
 
 if [ ! -f "$ESQUEMA" ]; then
@@ -52,4 +53,19 @@ existe() { db "$BASE" -e "CALL sp_objeto_autorizar(0, '$1', '$2')" | head -n1 | 
 [ "$(existe auth entrar)" = 1 ] || { echo "::error::/auth/entrar no está en el catálogo"; exit 1; }
 [ "$(existe noexiste nada)" = 0 ] || { echo "::error::una ruta inventada aparece en el catálogo"; exit 1; }
 echo "   /auth/entrar existe; /noexiste/nada no."
+echo "── Pruebas (apiService/tests)"
+cat > "$TMP/.env.pruebas" <<ENV
+DB_HOST=$DB_HOST
+DB_PORT=$DB_PORT
+DB_USER=$DB_USER
+DB_PASSWORD=$DB_PASSWORD
+DB_NAME=$BASE
+CRYPTO_KEY=clave-de-prueba-ci-de-32-bytes!!
+CRYPTO_IV=1234567890abcdef
+KEY_TOKEN=ci
+BASE_URL=
+MAIL_TO=buzon@prueba.test
+ENV
+PRUEBAS_ENV="$TMP/.env.pruebas" php apiService/tools/licencia_local.php --forzar
+PRUEBAS_ENV="$TMP/.env.pruebas" php apiService/tests/run.php
 echo "── Integración correcta"

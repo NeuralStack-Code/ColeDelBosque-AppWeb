@@ -1,0 +1,57 @@
+# Auditoría de commits y cambios: en cada push y PR revisa los commits nuevos (mensaje, archivos prohibidos que
+# entraron al historial) y todo el repo (secretos, .env, SQL, conflictos, depuración, .htaccess, JavaScript, catálogo).
+# El mismo script corre en local: php apiService/tools/auditoria/revisar.php --rango origin/master..HEAD
+name: Auditoría
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  auditoria:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0          # historial completo: hace falta para revisar el rango de commits
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring
+          coverage: none
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '20'
+
+      - name: Rango de commits a revisar
+        id: rango
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "rango=${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ github.event.before }}" ] && ! echo "${{ github.event.before }}" | grep -qE '^0+$' \
+               && git cat-file -e "${{ github.event.before }}" 2>/dev/null; then
+            echo "rango=${{ github.event.before }}..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            # Rama nueva: lo que trae respecto a master.
+            echo "rango=origin/master..${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Auditoría del repositorio y de los commits
+        run: php apiService/tools/auditoria/revisar.php --rango "${{ steps.rango.outputs.rango }}"
+
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "### Auditoría"
+            echo "Rango revisado: \`${{ steps.rango.outputs.rango }}\`"
+            echo ""
+            echo '```'
+            git log --no-merges --format='%h %an — %s' "${{ steps.rango.outputs.rango }}" | head -50
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

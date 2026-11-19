@@ -1,0 +1,18 @@
+# Análisis estático (lo corre la integración continua: .github/workflows/ci.yml). Igual que NeuralStack Code.
+# Nivel 0 = errores seguros (clases, funciones o métodos que no existen, llamadas mal formadas). Subirlo poco a poco.
+parameters:
+    level: 0
+    paths:
+        - index.php
+        - apiService
+        - webService/controllers
+        - webService/business
+        - webService/models
+        - webService/libs
+    excludePaths:
+        - apiService/tests
+        - apiService/storage
+    ignoreErrors:
+        # Los models se crean con new static() a propósito (Model::fromRow); ninguno define constructor.
+        - identifier: new.static
+          path: apiService/core/Model.php
